@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<blueprint xmlns="http://www.osgi.org/xmlns/blueprint/v1.0.0" default-activation="lazy">
+    
+    <reference
+        id="ledgerReaderService"
+        interface="dlt.client.tangle.services.ILedgerReader"
+        availability="optional"
+    />
+    
+    <reference
+        id="processorService"
+        interface="dlt.load.monitor.services.IProcessor"
+        availability="optional"
+    />
+    
+    <bean
+        id="ledgerConnector"
+        class="dlt.load.balancer.model.LedgerConnector">
+        <property name="ledgerReader" ref="ledgerReaderService"/>
+    </bean>
+    
+    <bean
+        id="balancer"
+        class="dlt.load.balancer.model.Balancer">
+        <property name="processor" ref="processorService"/>
+    </bean>
+
+</blueprint>

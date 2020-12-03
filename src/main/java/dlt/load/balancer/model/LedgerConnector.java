@@ -12,6 +12,5 @@ public class LedgerConnector {
     
     public void setLedgerReader(ILedgerReader ledgerReader){
         this.ledgerReader = ledgerReader;
-        System.out.println("LedgerReader injected");
     }
 }

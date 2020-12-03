@@ -3,7 +3,7 @@
 
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>org.iot.soft</groupId>
+    <groupId>br.uefs.larsid.dlt.iot.soft</groupId>
     <artifactId>SOFT-IoT-DLT-Load-Balancer</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>bundle</packaging>
@@ -13,12 +13,12 @@
 
     <dependencies>
         <dependency>
-            <groupId>org.iot.soft</groupId>
+            <groupId>br.uefs.larsid.dlt.iot.soft</groupId>
             <artifactId>SOFT-IoT-DLT-Client-Tangle</artifactId>
             <version>1.0-SNAPSHOT</version>
         </dependency>
         <dependency>
-            <groupId>org.iot.soft</groupId>
+            <groupId>br.uefs.larsid.dlt.iot.soft</groupId>
             <artifactId>SOFT-IoT-DLT-Load-Monitor</artifactId>
             <version>1.0-SNAPSHOT</version>
         </dependency>
@@ -72,7 +72,7 @@
     <repositories>
         <repository>
             <id>soft-iot-dlt-client-tangle-mvn-repo</id>
-            <url>https://raw.github.com/UellingtonDamasceno/soft-iot-dlt-client-tangle/mvn-repo/</url>
+            <url>https://raw.github.com/larsid/soft-iot-dlt-client-tangle/mvn-repo/</url>
             <snapshots>
                 <enabled>true</enabled>
                 <updatePolicy>always</updatePolicy>
@@ -80,7 +80,7 @@
         </repository>
         <repository>
             <id>soft-iot-dlt-load-monitor-mvn-repo</id>
-            <url>https://raw.github.com/UellingtonDamasceno/soft-iot-dlt-load-monitor/mvn-repo/</url>
+            <url>https://raw.github.com/larsid/soft-iot-dlt-load-monitor/mvn-repo/</url>
             <snapshots>
                 <enabled>true</enabled>
                 <updatePolicy>always</updatePolicy>

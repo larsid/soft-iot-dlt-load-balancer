@@ -17,7 +17,7 @@ public class MQTTNewConnectionsListener implements MqttCallback{
     private MqttClient client;
     
     public MQTTNewConnectionsListener(){
-        
+          
     }
     
     public void initialize(){
@@ -39,7 +39,6 @@ public class MQTTNewConnectionsListener implements MqttCallback{
 
     @Override
     public void messageArrived(String topic, MqttMessage message) throws Exception {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
     @Override

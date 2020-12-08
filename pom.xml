@@ -10,30 +10,42 @@
 
     <name>SOFT-IoT-DLT-Load-Balancer</name>
     <description>SOFT-IoT-Load-Balancer OSGi blueprint bundle project.</description>
-
+    
     <dependencies>
         <dependency>
             <groupId>br.uefs.larsid.dlt.iot.soft</groupId>
             <artifactId>SOFT-IoT-DLT-Client-Tangle</artifactId>
             <version>1.0-SNAPSHOT</version>
+            <scope>provided</scope>
         </dependency>
-        <dependency>
+<!--        <dependency>
             <groupId>br.uefs.larsid.dlt.iot.soft</groupId>
             <artifactId>SOFT-IoT-DLT-Load-Monitor</artifactId>
+            <version>1.0-SNAPSHOT</version>
+            <scope>provided</scope>
+        </dependency>-->
+        <dependency>
+            <groupId>br.uefs.larsid.dlt.iot.soft</groupId>
+            <artifactId>Extended-TATU-Wrapper</artifactId>
             <version>1.0-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>org.eclipse.paho</groupId>
             <artifactId>org.eclipse.paho.client.mqttv3</artifactId>
             <version>1.2.5</version>
-            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.json</groupId>
             <artifactId>json</artifactId>
             <version>20200518</version>
             <scope>compile</scope>
-        </dependency>  
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>SOFT-IoT-DLT-Load-Monitor</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -47,9 +59,17 @@
                     <instructions>
                         <Bundle-SymbolicName>${project.artifactId}</Bundle-SymbolicName>
                         <Bundle-Version>${project.version}</Bundle-Version>
-                        <Export-Package>
-                            dlt.load.balancer.*;version=${project.version}
-                        </Export-Package>
+                        <Embed-Dependency>
+                            org.eclipse.paho.client.mqttv3,
+                            json,
+                            Extended-TATU-Wrapper;
+                            scope=compile|runtime;
+                            inline=false
+                        </Embed-Dependency>
+                        <Embed-Directory>target/dependency</Embed-Directory>
+                        <Embed-StripGroup>true</Embed-StripGroup>
+                        <Embed-Transitive>true</Embed-Transitive>
+                        <Export-Package>{local-packages}</Export-Package>
                         <Import-Package>
                             *
                         </Import-Package>
@@ -65,7 +85,7 @@
                     <target>1.8</target>
                     <maxmem>256M</maxmem>
                 </configuration>
-            </plugin>
+            </plugin>          
         </plugins>
     </build>
     
@@ -81,6 +101,14 @@
         <repository>
             <id>soft-iot-dlt-load-monitor-mvn-repo</id>
             <url>https://raw.github.com/larsid/soft-iot-dlt-load-monitor/mvn-repo/</url>
+            <snapshots>
+                <enabled>true</enabled>
+                <updatePolicy>always</updatePolicy>
+            </snapshots>
+        </repository>
+        <repository>
+            <id>extended-tatu-wrapper-mvn-repo</id>
+            <url>https://raw.github.com/UellingtonDamasceno/extended-tatu-wrapper/mvn-repo/</url>
             <snapshots>
                 <enabled>true</enabled>
                 <updatePolicy>always</updatePolicy>

@@ -1,6 +1,7 @@
 package dlt.load.balancer.model;
 
 import dlt.client.tangle.services.ILedgerReader;
+import dlt.client.tangle.services.ILedgerWriter;
 
 /**
  *
@@ -9,6 +10,11 @@ import dlt.client.tangle.services.ILedgerReader;
  */
 public class LedgerConnector {
     private ILedgerReader ledgerReader;
+    private ILedgerWriter ledgerWriter;
+    
+    public void setLedgerWriter(ILedgerWriter ledgerWriter){
+        this.ledgerWriter = ledgerWriter;
+    }
     
     public void setLedgerReader(ILedgerReader ledgerReader){
         this.ledgerReader = ledgerReader;

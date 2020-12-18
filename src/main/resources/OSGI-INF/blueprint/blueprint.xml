@@ -6,46 +6,15 @@
              http://aries.apache.org/blueprint/xmlns/blueprint-cm/v1.1.0 http://aries.apache.org/schemas/blueprint-cm/blueprint-cm-1.1.0.xsd
              http://www.osgi.org/xmlns/blueprint/v1.0.0 https://www.osgi.org/xmlns/blueprint/v1.0.0/blueprint.xsd">
     
-    <cm:property-placeholder 
-        persistent-id="soft.iot.dlt.load.balancer"
-        update-strategy="reload">
-        <cm:default-properties>
-            <cm:property name="MQTTServerId" value="FoTGatway"/>
-            <cm:property name="MQTTHost" value="tcp://localhost" />
-            <cm:property name="MQTTPort" value="1883" />
-            <cm:property name="MQTTUsername" value="karaf" />
-            <cm:property name="MQTTPassword" value="karaf" />
-        </cm:default-properties>
-    </cm:property-placeholder>
+    <reference id="ledgerReaderService" interface="dlt.client.tangle.services.ILedgerReader"/>
+    <reference id="ledgerWriterService" interface="dlt.client.tangle.services.ILedgerWriter"/>
     
-<!--    <reference
-        id="ledgerReaderService"
-        interface="dlt.client.tangle.services.ILedgerReader"
-        availability="optional"
-    />
-    -->
-    <reference
-        id="processorService"
-        interface="dlt.load.monitor.services.IProcessor"
-    />
-    
-<!--    <bean
-        id="ledgerConnector"
-        class="dlt.load.balancer.model.LedgerConnector">
+    <bean id="ledgerConnector" class="dlt.load.balancer.model.LedgerConnector">
         <property name="ledgerReader" ref="ledgerReaderService"/>
-    </bean>-->
-    
-    <bean
-        id="MQTTNewConnectionsListener"
-        class="dlt.load.balancer.controller.MQTTNewConnectionsListener"
-        init-method="initialize"
-        destroy-method="disconnect">
-        <argument value="${MQTTHost}"/>
-        <argument value="${MQTTPort}"/>
-        <argument value="${MQTTServerId}"/>
-        <argument value="${MQTTUsername}"/>
-        <argument value="${MQTTPassword}"/>
-        <property name="processor" ref="processorService"/>
+        <property name="ledgerWriter" ref="ledgerWriterService"/>
     </bean>
-
+   
+    <bean id="balancer" class="dlt.load.balancer.model.Balancer">
+        <property name="ledgerConnector" ref="ledgerConnector"/>
+    </bean>   
 </blueprint>

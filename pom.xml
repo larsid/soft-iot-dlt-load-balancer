@@ -13,21 +13,21 @@
     
     <dependencies>
         <dependency>
-            <groupId>br.uefs.larsid.dlt.iot.soft</groupId>
-            <artifactId>SOFT-IoT-DLT-Client-Tangle</artifactId>
-            <version>1.0-SNAPSHOT</version>
+            <groupId>com.github.larsid</groupId>
+            <artifactId>soft-iot-dlt-client-tangle</artifactId>
+            <version>master-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
+	<dependency>
+	    <groupId>com.github.larsid</groupId>
+	    <artifactId>soft-iot-dlt-load-monitor</artifactId>
+	    <version>master-SNAPSHOT</version>
+            <scope>provided</scope>
+	</dependency>
         <dependency>
-            <groupId>br.uefs.larsid.dlt.iot.soft</groupId>
-            <artifactId>SOFT-IoT-DLT-Load-Monitor</artifactId>
-            <version>1.0-SNAPSHOT</version>
-            <type>jar</type>
-        </dependency>
-        <dependency>
-            <groupId>br.uefs.larsid.dlt.iot.soft</groupId>
-            <artifactId>Extended-TATU-Wrapper</artifactId>
-            <version>1.0-SNAPSHOT</version>
+            <groupId>com.github.UellingtonDamasceno</groupId>
+            <artifactId>extended-tatu-wrapper</artifactId>
+            <version>main-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>org.json</groupId>
@@ -50,7 +50,7 @@
                         <Bundle-Version>${project.version}</Bundle-Version>
                         <Embed-Dependency>
                             json,
-                            Extended-TATU-Wrapper;
+                            extended-tatu-wrapper;
                             scope=compile|runtime;
                             inline=false
                         </Embed-Dependency>
@@ -77,28 +77,8 @@
     
     <repositories>
         <repository>
-            <id>soft-iot-dlt-client-tangle-mvn-repo</id>
-            <url>https://raw.github.com/larsid/soft-iot-dlt-client-tangle/mvn-repo/</url>
-            <snapshots>
-                <enabled>true</enabled>
-                <updatePolicy>always</updatePolicy>
-            </snapshots>
-        </repository>
-        <repository>
-            <id>soft-iot-dlt-load-monitor-mvn-repo</id>
-            <url>https://raw.github.com/larsid/soft-iot-dlt-load-monitor/mvn-repo/</url>
-            <snapshots>
-                <enabled>true</enabled>
-                <updatePolicy>always</updatePolicy>
-            </snapshots>
-        </repository>
-        <repository>
-            <id>extended-tatu-wrapper-mvn-repo</id>
-            <url>https://raw.github.com/UellingtonDamasceno/extended-tatu-wrapper/mvn-repo/</url>
-            <snapshots>
-                <enabled>true</enabled>
-                <updatePolicy>always</updatePolicy>
-            </snapshots>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
         </repository>
     </repositories>
 

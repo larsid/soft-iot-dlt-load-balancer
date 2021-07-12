@@ -18,6 +18,12 @@
             <version>master-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <groupId>com.github.larsid</groupId>
+            <artifactId>soft-iot-dlt-id-manager</artifactId>
+            <version>main-SNAPSHOT</version>
+            <scope>provided</scope>
+        </dependency>
 	<dependency>
 	    <groupId>com.github.larsid</groupId>
 	    <artifactId>soft-iot-dlt-load-monitor</artifactId>
@@ -25,9 +31,10 @@
             <scope>provided</scope>
 	</dependency>
         <dependency>
-            <groupId>com.github.UellingtonDamasceno</groupId>
-            <artifactId>extended-tatu-wrapper</artifactId>
-            <version>main-SNAPSHOT</version>
+            <groupId>com.github.larsid</groupId>
+            <artifactId>soft-iot-mapping-devices</artifactId>
+            <version>master-SNAPSHOT</version>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.json</groupId>

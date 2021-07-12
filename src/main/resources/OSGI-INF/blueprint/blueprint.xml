@@ -6,15 +6,35 @@
              http://aries.apache.org/blueprint/xmlns/blueprint-cm/v1.1.0 http://aries.apache.org/schemas/blueprint-cm/blueprint-cm-1.1.0.xsd
              http://www.osgi.org/xmlns/blueprint/v1.0.0 https://www.osgi.org/xmlns/blueprint/v1.0.0/blueprint.xsd">
     
+    <cm:property-placeholder
+        persistent-id="soft.iot.dlt.load.balancer"
+        update-strategy="reload">
+        <cm:default-properties>
+            <cm:property name="TIMEOUT_LB_REPLY" value="10000" />
+            <cm:property name="TIMEOUT_GATEWAY" value="1000000" />
+            <cm:property name="TOPICS" value="[]" />
+        </cm:default-properties>
+    </cm:property-placeholder>
+    
     <reference id="ledgerReaderService" interface="dlt.client.tangle.services.ILedgerReader"/>
     <reference id="ledgerWriterService" interface="dlt.client.tangle.services.ILedgerWriter"/>
+    <reference id="deviceManagerService" interface="br.uefs.larsid.extended.mapping.devices.services.IDevicePropertiesManager"/>
+    <reference id="idManagerService" interface="dlt.id.manager.services.IIDManagerService"/>
+    <reference id="DLTGroupManagerService" interface="dlt.id.manager.services.IDLTGroupManager"/>
     
     <bean id="ledgerConnector" class="dlt.load.balancer.model.LedgerConnector">
         <property name="ledgerReader" ref="ledgerReaderService"/>
         <property name="ledgerWriter" ref="ledgerWriterService"/>
     </bean>
    
-    <bean id="balancer" class="dlt.load.balancer.model.Balancer">
-        <property name="ledgerConnector" ref="ledgerConnector"/>
+    <bean id="balancer" 
+          class="dlt.load.balancer.model.Balancer"
+          init-method="start"
+          destroy-method="stop">
+        <argument value="${TIMEOUT_LB_REPLY}"/>
+        <argument value="${TIMEOUT_GATEWAY}"/>
+        <property name="connector" ref="ledgerConnector"/>
+        <property name="idManager" ref="idManagerService"/>
+        <property name="subscribedTopics" value="${TOPICS}"/>
     </bean>   
 </blueprint>

@@ -1,6 +1,6 @@
 package dlt.load.balancer.model;
 
-import dlt.client.tangle.model.Transaction;
+import dlt.client.tangle.model.transactions.Transaction;
 import dlt.client.tangle.services.ILedgerReader;
 import dlt.client.tangle.services.ILedgerSubscriber;
 import dlt.client.tangle.services.ILedgerWriter;

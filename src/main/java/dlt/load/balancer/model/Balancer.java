@@ -1,8 +1,5 @@
 package dlt.load.balancer.model;
 
-import static dlt.client.tangle.enums.TransactionType.LB_ENTRY;
-import static dlt.client.tangle.enums.TransactionType.LB_ENTRY_REPLY;
-import static dlt.client.tangle.enums.TransactionType.LB_REQUEST;
 import static java.util.stream.Collectors.toList;
 
 import br.uefs.larsid.extended.mapping.devices.services.IDevicePropertiesManager;
@@ -21,21 +18,13 @@ import dlt.client.tangle.model.transactions.Transaction;
 import dlt.client.tangle.services.ILedgerSubscriber;
 import dlt.id.manager.services.IDLTGroupManager;
 import dlt.id.manager.services.IIDManagerService;
-import freemarker.core.BuiltInForNodeEx;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.json.JSONArray;
 
@@ -205,6 +194,8 @@ public class Balancer implements ILedgerSubscriber {
       if(transaction.getSource().equals(this.buildSource())) {
         // Definindo minha última transação enviada.
         this.lastTransaction = transaction;
+        
+        executeTimeOutLB();
       } else {
         // Caso seja de outro gateway.
         System.out.println("Receive: " + TransactionType.LB_ENTRY);
@@ -263,7 +254,7 @@ public class Balancer implements ILedgerSubscriber {
             transaction.getType().equals(TransactionType.LB_ENTRY_REPLY) &&
             ((TargetedTransaction) transaction).getTarget().equals(this.buildSource())
           ) {
-            // timerTaskLb.cancel(); // Talvez remover
+            timerTaskLb.cancel();
 
             String source = this.buildSource();
             String group = this.groupManager.getGroup();
@@ -305,6 +296,9 @@ public class Balancer implements ILedgerSubscriber {
             // Enviar LB_REPLY.
             Transaction transactionReply = new Reply(source, group, newTarget);
             this.sendTransaction(transactionReply);
+            
+            // Colocar para a última transação ser nula.
+            this.lastTransaction = null;
           }
   
           break;
@@ -341,12 +335,6 @@ public class Balancer implements ILedgerSubscriber {
             // Colocar para a última transação ser nula.
             this.lastTransaction = null;
           }
-  
-          break;
-  
-        case LB_REPLY:
-          // Colocar para a última transação ser nula.
-          this.lastTransaction = null;
   
           break;
   

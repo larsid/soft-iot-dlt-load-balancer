@@ -30,8 +30,8 @@ import org.json.JSONArray;
 
 /**
  *
- * @author  Antonio Crispim, Uellington Damasceno
- * @version 0.0.1
+ * @author  Allan Capistrano, Antonio Crispim, Uellington Damasceno
+ * @version 0.0.2
  */
 public class Balancer implements ILedgerSubscriber {
 
@@ -53,19 +53,18 @@ public class Balancer implements ILedgerSubscriber {
   private int timerPass;
   private int resent;
   private Status lastStatus;
-  //Parametrizar
+  private String lastRemovedDevice;
+
   final Duration timeout = Duration.ofSeconds(40);
   ExecutorService executor = Executors.newSingleThreadExecutor();
-
-  String lastRemovedDevice;
 
   public Balancer(long timeoutLB, long timeoutGateway) {
     this.TIMEOUT_LB_REPLY = timeoutLB;
     this.TIMEOUT_GATEWAY = timeoutGateway;
 
-    buildTimerResendTransaction();
-    resent = 0;
-    lastStatus = null;
+    this.buildTimerResendTransaction();
+    this.resent = 0;
+    this.lastStatus = null;
   }
 
   public void buildTimerTaskLB() {
@@ -79,7 +78,7 @@ public class Balancer implements ILedgerSubscriber {
           if ((timerPass * 1000) >= TIMEOUT_LB_REPLY) {
             lastTransaction = null;
             timerTaskLb.cancel();
-            System.out.println("TEMPO ESGOTADO");
+            System.out.println("TIME'S UP");
           }
         }
       };
@@ -96,7 +95,7 @@ public class Balancer implements ILedgerSubscriber {
           if ((timerPass * 1000) >= TIMEOUT_GATEWAY) {
             resendTransaction();
             timerTaskGateWay.cancel();
-            System.out.println("TEMPO ESGOTADO");
+            System.out.println("TIME'S UP");
           }
         }
       };
@@ -104,12 +103,10 @@ public class Balancer implements ILedgerSubscriber {
 
   public void setPublisher(IPublisher iPublisher) {
     this.iPublisher = iPublisher;
-    System.out.println("IPublisher SETADO");
   }
 
   public void setDeviceManager(IDevicePropertiesManager deviceManager) {
     this.deviceManager = deviceManager;
-    System.out.println("DEVICE MANAGER SETADO");
   }
 
   public void setConnector(LedgerConnector connector) {
@@ -125,8 +122,8 @@ public class Balancer implements ILedgerSubscriber {
   }
 
   public void setSubscribedTopics(String topicsJSON) {
-    System.out.println("TOPICOS SETADOS");
-    System.out.println(topicsJSON);
+    System.out.println("Set topics: " + topicsJSON);
+
     this.subscribedTopics =
       new JSONArray(topicsJSON)
         .toList()
@@ -149,45 +146,17 @@ public class Balancer implements ILedgerSubscriber {
   }
 
   private void messageArrived(Transaction transaction) {
-    System.out.println("AGUARDANDO ENTRY");
+    System.out.println("Waiting for LB_ENTRY");
     System.out.println("Load  - Last transaction is Null");
-
-    // if (
-    //   transaction != null &&
-    //   transaction.getType().equals(TransactionType.LB_STATUS) &&
-    //   transaction.getSource().equals(buildSource())
-    // ) lastStatus = (Status) transaction;
 
     if (
       transaction.getType().equals(TransactionType.LB_STATUS) && 
       transaction.getSource().equals(this.buildSource())
     ){
       this.lastStatus = (Status) transaction;
-      // REMOVER - Supondo que o load-monitor que envia de tempos em tempos o status
     }
 
-    // if (
-    //   transaction != null &&
-    //   transaction.getType().equals(TransactionType.LB_ENTRY)
-    // ) {
-    //   System.out.println("RECEBI LB_ENTRY");
-    //   if (transaction.getSource().equals(buildSource())) { //Verificar viabilidade de inserir um serviço de atualização para o monitor.
-    //     this.lastTransaction = transaction;
-    //     executeTimeOutLB();
-    //   } else {
-    //     if (lastStatus != null && lastStatus.getAvaible()) {
-    //       String source = buildSource();
-    //       String group = this.groupManager.getGroup();
-    //       String newTarget = transaction.getSource();
-
-    //       Transaction transactionReply = new LBReply(source, group, newTarget);
-    //       this.sendTransaction(transactionReply);
-    //     }
-    //   }
-    // }
-
     if(transaction.getType().equals(TransactionType.LB_ENTRY)) {
-      // REMOVER - Supondo que o load-monitor que envia de tempos em tempos o entry
       if(transaction.getSource().equals(this.buildSource())) {
         // Definindo minha última transação enviada.
         this.lastTransaction = transaction;
@@ -210,43 +179,13 @@ public class Balancer implements ILedgerSubscriber {
     }
   }
 
-  private void timerTaskLBGateWay() {
-    timerPass = 0;
-    timerTaskLb =
-      new TimerTask() {
-        @Override
-        public void run() {
-          timerPass = timerPass + 1;
-          System.out.println(timerPass);
-
-          if ((timerPass * 1000) >= TIMEOUT_GATEWAY) {
-            lastTransaction = null;
-            timerTaskLb.cancel();
-            System.out.println("TEMPO ESGOTADO");
-          }
-        }
-      };
-  }
-
   private void processTransactions(Transaction transaction) {
-    System.out.println("PROCESSANDO MENSAGEM.....");
-
-    // if (transaction != null) {
-    //   System.out.println(
-    //     "Tipo da Mensagem que chegou: " + transaction.getType()
-    //   );
-    // }
-
-    // if (lastTransaction != null) {
-    //   System.out.println(
-    //     "Tipo da ultima mensagem: " + lastTransaction.getType()
-    //   );
-    // }
+    System.out.println("processing transaction...");
 
     // Somente se as transações recebidas não forem enviadas pelo próprio gateway.
     if (!transaction.getSource().equals(this.buildSource())) {
-      switch (lastTransaction.getType()) { // REMOVER - última transação que enviei
-        case LB_ENTRY: // REMOVER - transação que recebi
+      switch (lastTransaction.getType()) {
+        case LB_ENTRY:
           if (
             transaction.getType().equals(TransactionType.LB_ENTRY_REPLY) &&
             ((TargetedTransaction) transaction).getTarget().equals(this.buildSource())
@@ -311,7 +250,6 @@ public class Balancer implements ILedgerSubscriber {
             String group = this.groupManager.getGroup();
             String newTarget = transaction.getSource();
 
-            // Remover - dispositivo enviado.
             try {
               this.removeFirstDevice(transaction.getSource().split("/")[2]);
 
@@ -341,130 +279,6 @@ public class Balancer implements ILedgerSubscriber {
           break;
       }
     }
-
-    // if (
-    //   transaction != null &&
-    //   lastTransaction != null &&
-    //   transaction.getType() != TransactionType.LB_STATUS &&
-    //   transaction.getType() != TransactionType.LB_ENTRY &&
-    //   !transaction.getSource().equals(buildSource())
-    // ) {
-    //   switch (lastTransaction.getType()) {
-    //     case LB_ENTRY:
-    //       {
-    //         System.out.println("CASE ENTRY");
-
-    //         String target = ((TargetedTransaction) transaction).getTarget();
-
-    //         if (
-    //           transaction.getType() == TransactionType.LB_ENTRY_REPLY &&
-    //           target.equals(buildSource())
-    //         ) {
-    //           try {
-    //             timerTaskLb.cancel();
-    //             String source = buildSource();
-    //             String group = this.groupManager.getGroup();
-    //             String newTarget = transaction.getSource();
-
-    //             Device device = this.deviceManager.getAllDevices().get(0);
-    //             String deviceString = DeviceWrapper.toJSON(device);
-
-    //             Transaction transactionReply = new Request(
-    //               source,
-    //               group,
-    //               deviceString,
-    //               newTarget
-    //             );
-    //             this.sendTransaction(transactionReply);
-    //             executeTimeOutGateWay();
-    //           } catch (IOException ex) {
-    //             System.out.println(
-    //               "Load Balancer - Não foi possível recuperar a lista de dispositivos."
-    //             );
-    //           }
-    //         }
-    //         break;
-    //       }
-    //     case LB_ENTRY_REPLY:
-    //       {
-    //         System.out.println("CASE LB_ENTRY_REPLY");
-
-    //         String target = ((TargetedTransaction) transaction).getTarget();
-            
-    //         System.out.println("Target : " + target);
-    //         System.out.println(
-    //           "Ip do gateway : " +
-    //           this.groupManager.getGroup() +
-    //           "/" +
-    //           this.idManager.getIP()
-    //         );
-    //         if (
-    //           transaction.getType() == TransactionType.LB_REQUEST &&
-    //           target.equals(buildSource())
-    //         ) {
-    //           timerTaskGateWay.cancel();
-
-    //           String device = ((Request) transaction).getDevice();
-
-    //           String source = buildSource();
-    //           String group = this.groupManager.getGroup();
-    //           String newTarget = transaction.getSource();
-
-    //           Transaction transactionReply = new Reply(
-    //             source,
-    //             group,
-    //             newTarget
-    //           );
-    //           this.sendTransaction(transactionReply); // Iniciar meu contador de timeout
-    //           this.loadSwapReceberDispositivo(device);
-              
-    //           // Enviando mensagem de posse
-    //           Transaction transactionDevice = new LBDevice(
-    //             source,
-    //             group,
-    //             device,
-    //             newTarget
-    //           );
-    //           this.sendTransaction(transactionDevice);
-
-    //           this.lastTransaction = null;
-    //         }
-    //         break;
-    //       }
-    //     /**/
-    //     case LB_REQUEST:
-    //       {
-    //         String target = ((TargetedTransaction) transaction).getTarget();
-    //         System.out.println("Target no REQUEST");
-    //         System.out.println(target);
-
-    //         System.out.println("IPMANAGER NO REQUEST ");
-    //         System.out.println(this.idManager.getIP());
-
-    //         if (
-    //           transaction.getType() == TransactionType.LB_REPLY &&
-    //           target.equals(buildSource())
-    //         ) {
-    //           timerTaskGateWay.cancel();
-
-    //           System.out.println("RECEBI LB_REPLY");
-    //           try {
-    //             this.removeFirstDevice(transaction.getSource().split("/")[2]);
-    //           } catch (MqttException e) {
-    //             // TODO Auto-generated catch block
-    //             e.printStackTrace();
-    //           }
-    //           this.lastTransaction = null;
-    //         }
-    //         break;
-    //       }
-    //     default:
-    //       {
-    //         System.out.println("Chegou algo que não deveria!");
-    //         break;
-    //       }
-    //   }
-    // }
   }
 
   private void executeTimeOutGateWay() {
@@ -478,7 +292,7 @@ public class Balancer implements ILedgerSubscriber {
           if ((timerPass * 1000) >= TIMEOUT_LB_REPLY) {
             lastTransaction = null;
             timerTaskGateWay.cancel();
-            System.out.println("TEMPO ESGOTADO");
+            System.out.println("TIME'S UP");
           }
         }
       };
@@ -499,7 +313,7 @@ public class Balancer implements ILedgerSubscriber {
           if ((timerPass * 1000) >= TIMEOUT_LB_REPLY) {
             lastTransaction = null;
             timerTaskLb.cancel();
-            System.out.println("TEMPO ESGOTADO");
+            System.out.println("TIME'S UP");
           }
         }
       };
@@ -563,7 +377,6 @@ public class Balancer implements ILedgerSubscriber {
         jsonPublish.addProperty("user", "karaf");
         jsonPublish.addProperty("password", "karaf");
         
-        //TODO Testar
         iPublisher.publish(
           deviceARemover.getId(),
           "SET VALUE brokerMqtt{" + jsonPublish.toString() + "}"
@@ -572,7 +385,6 @@ public class Balancer implements ILedgerSubscriber {
         deviceManager.removeDevice(allDevices.get(0).getId());
       }
     } catch (IOException ioe) {
-      // Logger.getLogger(Balancer.class.getName()).log(Level.SEVERE, null, ex);
       System.out.println("Error! To retrieve device list or to remove the first device.");
       ioe.printStackTrace();
     }
@@ -588,9 +400,7 @@ public class Balancer implements ILedgerSubscriber {
       );
 
       deviceManager.addDevice(device);
-      // lastTransaction = null;
     } catch (IOException ioe) {
-      // Logger.getLogger(Balancer.class.getName()).log(Level.SEVERE, null, ex);
       System.out.println("Error! To add a new device to the list.");
       ioe.printStackTrace();
     }

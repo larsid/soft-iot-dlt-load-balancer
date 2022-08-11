@@ -57,7 +57,6 @@ public class Balancer implements ILedgerSubscriber {
   final Duration timeout = Duration.ofSeconds(40);
   ExecutorService executor = Executors.newSingleThreadExecutor();
 
-  //Allan
   String lastRemovedDevice;
 
   public Balancer(long timeoutLB, long timeoutGateway) {
@@ -158,8 +157,6 @@ public class Balancer implements ILedgerSubscriber {
     //   transaction.getType().equals(TransactionType.LB_STATUS) &&
     //   transaction.getSource().equals(buildSource())
     // ) lastStatus = (Status) transaction;
-
-    System.out.println("SOURCE: "+ transaction.getSource());
 
     if (
       transaction.getType().equals(TransactionType.LB_STATUS) && 
@@ -327,13 +324,13 @@ public class Balancer implements ILedgerSubscriber {
               );
               
               this.sendTransaction(transactionDevice);
+              
+              // Colocar para a última transação ser nula.
+              this.lastTransaction = null;
             } catch (MqttException me) {
               System.out.println("Load Balancer - Error! Unable to remove the first device.");
               me.printStackTrace();
             }
-
-            // Colocar para a última transação ser nula.
-            this.lastTransaction = null;
           }
   
           break;

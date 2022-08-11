@@ -7,7 +7,7 @@ import dlt.client.tangle.services.ILedgerWriter;
 
 /**
  *
- * @author Uellington Damasceno
+ * @author  Antonio Crispim, Uellington Damasceno
  * @version 0.0.1
  */
 public class LedgerConnector {

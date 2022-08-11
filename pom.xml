@@ -13,27 +13,33 @@
     
     <dependencies>
         <dependency>
-            <groupId>com.github.larsid</groupId>
-            <artifactId>soft-iot-dlt-client-tangle</artifactId>
-            <version>master-SNAPSHOT</version>
+            <groupId>br.uefs.larsid.dlt.iot.soft</groupId>
+            <artifactId>SOFT-IoT-DLT-Client-Tangle</artifactId>
+            <version>1.0-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>com.github.larsid</groupId>
-            <artifactId>soft-iot-dlt-id-manager</artifactId>
-            <version>main-SNAPSHOT</version>
+            <groupId>br.uefs.larsid.dlt.iot.soft</groupId>
+            <artifactId>SOFT-IoT-DLT-ID-Manager</artifactId>
+            <version>1.0-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
 	<dependency>
-	    <groupId>com.github.larsid</groupId>
-	    <artifactId>soft-iot-dlt-load-monitor</artifactId>
-	    <version>master-SNAPSHOT</version>
-            <scope>provided</scope>
+	    <groupId>br.uefs.larsid.dlt.iot.soft</groupId>
+	    <artifactId>SOFT-IoT-DLT-Load-Monitor</artifactId>
+	    <version>1.0-SNAPSHOT</version>
+        <scope>provided</scope>
 	</dependency>
         <dependency>
-            <groupId>com.github.larsid</groupId>
+            <groupId>br.ufba.dcc.wiser.soft_iot</groupId>
             <artifactId>soft-iot-mapping-devices</artifactId>
-            <version>master-SNAPSHOT</version>
+            <version>1.0.0</version>
+            <scope>provided</scope>
+        </dependency>
+         <dependency>
+            <groupId>br.uefs.larsid.dlt.iot.soft</groupId>
+            <artifactId>SOFT-IoT-DLT-Auth</artifactId>
+            <version>1.0-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -41,6 +47,11 @@
             <artifactId>json</artifactId>
             <version>20200518</version>
             <scope>compile</scope>
+        </dependency>
+         <dependency>
+            <groupId>org.eclipse.paho</groupId>
+            <artifactId>org.eclipse.paho.client.mqttv3</artifactId>
+            <version>1.2.5</version>
         </dependency>
     </dependencies>
 
@@ -56,7 +67,10 @@
                         <Bundle-SymbolicName>${project.artifactId}</Bundle-SymbolicName>
                         <Bundle-Version>${project.version}</Bundle-Version>
                         <Embed-Dependency>
+                       		gson,
                             json,
+                            org.eclipse.paho.client.mqttv3
+                            ,
                             extended-tatu-wrapper;
                             scope=compile|runtime;
                             inline=false

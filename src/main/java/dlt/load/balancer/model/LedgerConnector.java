@@ -38,4 +38,8 @@ public class LedgerConnector {
     public Transaction getTransactionByHash(String hash) {
         return this.ledgerWriter.getTransactionByHash(hash);
     }
+
+    public ILedgerWriter getLedgerWriter() {
+      return ledgerWriter;
+    }
 }

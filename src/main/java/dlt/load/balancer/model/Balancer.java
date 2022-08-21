@@ -19,12 +19,16 @@ import dlt.client.tangle.services.ILedgerSubscriber;
 import dlt.id.manager.services.IDLTGroupManager;
 import dlt.id.manager.services.IIDManagerService;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.json.JSONArray;
 
@@ -33,30 +37,28 @@ import org.json.JSONArray;
  * @author  Allan Capistrano, Antonio Crispim, Uellington Damasceno
  * @version 0.0.2
  */
-public class Balancer implements ILedgerSubscriber {
+public class Balancer implements ILedgerSubscriber, Runnable {
 
+  private final ScheduledExecutorService executor;
   private LedgerConnector connector;
-
   private final Long TIMEOUT_LB_REPLY;
   private final Long TIMEOUT_GATEWAY;
-
   private Transaction lastTransaction;
   private List<String> subscribedTopics;
-
   private IDevicePropertiesManager deviceManager;
   private IIDManagerService idManager;
   private IDLTGroupManager groupManager;
   private IPublisher iPublisher;
-
   private TimerTask timerTaskLb;
   private TimerTask timerTaskGateWay;
   private int timerPass;
   private int resent;
   private Status lastStatus;
   private String lastRemovedDevice;
+  private boolean flagSubscribe;
 
   final Duration timeout = Duration.ofSeconds(40);
-  ExecutorService executor = Executors.newSingleThreadExecutor();
+  ExecutorService executorTimeout = Executors.newSingleThreadExecutor();
 
   public Balancer(long timeoutLB, long timeoutGateway) {
     this.TIMEOUT_LB_REPLY = timeoutLB;
@@ -65,6 +67,9 @@ public class Balancer implements ILedgerSubscriber {
     this.buildTimerResendTransaction();
     this.resent = 0;
     this.lastStatus = null;
+    this.flagSubscribe = true;
+
+    this.executor = Executors.newSingleThreadScheduledExecutor();
   }
 
   public void buildTimerTaskLB() {
@@ -134,15 +139,28 @@ public class Balancer implements ILedgerSubscriber {
   }
 
   public void start() {
-    this.subscribedTopics.forEach(
-        topic -> this.connector.subscribe(topic, this)
-      );
+    this.executor.scheduleAtFixedRate(this, 0, 5, TimeUnit.SECONDS);
   }
 
   public void stop() {
+    this.flagSubscribe = true;
+
     this.subscribedTopics.forEach(
         topic -> this.connector.unsubscribe(topic, this)
       );
+
+    this.executor.shutdown();
+
+    try {
+      if (
+        this.executor.awaitTermination(500, TimeUnit.MILLISECONDS) &&
+        !this.executor.isShutdown()
+      ) {
+        this.executor.shutdownNow();
+      }
+    } catch (InterruptedException ex) {
+      this.executor.shutdownNow();
+    }
   }
 
   private void messageArrived(Transaction transaction) {
@@ -414,7 +432,7 @@ public class Balancer implements ILedgerSubscriber {
   }
 
   public void stopTimeout() {
-    while (!executor.isShutdown());
+    while (!executorTimeout.isShutdown());
   }
 
   @Override
@@ -438,6 +456,35 @@ public class Balancer implements ILedgerSubscriber {
       }
     } else {
       System.out.println("Load balancer - New message - Invalid");
+    }
+  }
+
+  /* Thread para verificar o IP do client tangle e se inscrever nos tópicos
+    de interesse.*/
+  @Override
+  public void run() {
+    try {
+      InetAddress inet = InetAddress.getByName(
+        this.connector.getLedgerWriter().getUrl()
+      );
+
+      if (inet.isReachable(3000)) {
+        if (this.flagSubscribe) {
+          this.subscribedTopics.forEach(
+              topic -> this.connector.subscribe(topic, this)
+            );
+
+          this.flagSubscribe = false;
+        }
+      } else {
+        this.flagSubscribe = true;
+      }
+    } catch (UnknownHostException uhe) {
+      System.out.println("Error! Unknown Host.");
+      uhe.printStackTrace();
+    } catch (IOException ioe) {
+      System.out.println("Error! Can't connect to InetAddress.");
+      ioe.printStackTrace();
     }
   }
 }

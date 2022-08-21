@@ -40,26 +40,22 @@ import org.json.JSONArray;
 public class Balancer implements ILedgerSubscriber, Runnable {
 
   private final ScheduledExecutorService executor;
-
   private LedgerConnector connector;
-
   private final Long TIMEOUT_LB_REPLY;
   private final Long TIMEOUT_GATEWAY;
-
   private Transaction lastTransaction;
   private List<String> subscribedTopics;
-
   private IDevicePropertiesManager deviceManager;
   private IIDManagerService idManager;
   private IDLTGroupManager groupManager;
   private IPublisher iPublisher;
-
   private TimerTask timerTaskLb;
   private TimerTask timerTaskGateWay;
   private int timerPass;
   private int resent;
   private Status lastStatus;
   private String lastRemovedDevice;
+  private boolean flagSubscribe;
 
   final Duration timeout = Duration.ofSeconds(40);
   ExecutorService executorTimeout = Executors.newSingleThreadExecutor();
@@ -71,6 +67,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
     this.buildTimerResendTransaction();
     this.resent = 0;
     this.lastStatus = null;
+    this.flagSubscribe = true;
 
     this.executor = Executors.newSingleThreadScheduledExecutor();
   }
@@ -146,6 +143,8 @@ public class Balancer implements ILedgerSubscriber, Runnable {
   }
 
   public void stop() {
+    this.flagSubscribe = true;
+
     this.subscribedTopics.forEach(
         topic -> this.connector.unsubscribe(topic, this)
       );
@@ -470,9 +469,15 @@ public class Balancer implements ILedgerSubscriber, Runnable {
       );
 
       if (inet.isReachable(3000)) {
-        this.subscribedTopics.forEach(
-            topic -> this.connector.subscribe(topic, this)
-          );
+        if (this.flagSubscribe) {
+          this.subscribedTopics.forEach(
+              topic -> this.connector.subscribe(topic, this)
+            );
+
+          this.flagSubscribe = false;
+        }
+      } else {
+        this.flagSubscribe = true;
       }
     } catch (UnknownHostException uhe) {
       System.out.println("Error! Unknown Host.");

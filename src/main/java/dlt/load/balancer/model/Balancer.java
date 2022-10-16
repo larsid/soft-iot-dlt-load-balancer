@@ -447,7 +447,10 @@ public class Balancer implements ILedgerSubscriber, Runnable {
       Transaction transaction =
         this.connector.getTransactionByHash(hashTransaction);
 
-      if (transaction != null) {
+      if (
+        transaction != null &&
+        System.currentTimeMillis() - transaction.getPublishedAt() < 15000 // Evitar o processamento de mensagens antigas.
+      ) {
         if (lastTransaction != null) {
           this.processTransactions(transaction);
         } else {

@@ -21,485 +21,492 @@ import dlt.id.manager.services.IIDManagerService;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.time.Duration;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.json.JSONArray;
 import java.util.logging.Logger;
 
 /**
  *
- * @author  Allan Capistrano, Antonio Crispim, Uellington Damasceno
+ * @author Allan Capistrano, Antonio Crispim, Uellington Damasceno
  * @version 0.0.2
  */
 public class Balancer implements ILedgerSubscriber, Runnable {
 
-  private final ScheduledExecutorService executor;
-  private LedgerConnector connector;
-  private final Long TIMEOUT_LB_REPLY;
-  private final Long TIMEOUT_GATEWAY;
-  private Transaction lastTransaction;
-  private List<String> subscribedTopics;
-  private IDevicePropertiesManager deviceManager;
-  private IIDManagerService idManager;
-  private IDLTGroupManager groupManager;
-  private IPublisher iPublisher;
-  private TimerTask timerTaskLb;
-  private TimerTask timerTaskGateWay;
-  private int timerPass;
-  private int resent;
-  private Status lastStatus;
-  private String lastRemovedDevice;
-  private boolean flagSubscribe;
-  private Logger log;
+    private final ScheduledExecutorService executor;
+    private TimerTask timerTaskLb, timerTaskGateWay;
 
-  final Duration timeout = Duration.ofSeconds(40);
-  ExecutorService executorTimeout = Executors.newSingleThreadExecutor();
+    private LedgerConnector connector;
 
-  public Balancer(long timeoutLB, long timeoutGateway) {
-    this.TIMEOUT_LB_REPLY = timeoutLB;
-    this.TIMEOUT_GATEWAY = timeoutGateway;
+    private final Long TIMEOUT_LB_REPLY, TIMEOUT_GATEWAY;
+    private Transaction lastTransaction;
+    private List<String> subscribedTopics;
+    
+    private IDevicePropertiesManager deviceManager;
+    private IIDManagerService idManager;
+    private IDLTGroupManager groupManager;
+    private IPublisher publisher;
+    
+    private int timerPass, resent;
+    private Status lastStatus;
+    private String lastRemovedDevice;
+    private boolean flagSubscribe;
+    private static final Logger logger = Logger.getLogger(Balancer.class.getName());
 
-    this.buildTimerResendTransaction();
-    this.resent = 0;
-    this.lastStatus = null;
-    this.flagSubscribe = true;
+    public Balancer(long timeoutLB, long timeoutGateway) {
+        this.TIMEOUT_LB_REPLY = timeoutLB;
+        this.TIMEOUT_GATEWAY = timeoutGateway;
 
-    this.executor = Executors.newSingleThreadScheduledExecutor();
+        this.buildTimerResendTransaction();
+        this.resent = 0;
+        this.lastStatus = null;
+        this.flagSubscribe = true;
 
-    this.log = Logger.getLogger(Balancer.class.getName());
-  }
-
-  public void buildTimerTaskLB() {
-    timerTaskLb =
-      new TimerTask() {
-        @Override
-        public void run() {
-          Logger log = Logger.getLogger(Balancer.class.getName());
-          
-          timerPass = timerPass + 1;
-          log.info(String.valueOf(timerPass));
-
-          if ((timerPass * 1000) >= TIMEOUT_LB_REPLY) {
-            lastTransaction = null;
-            timerTaskLb.cancel();
-            log.info("TIME'S UP");
-          }
-        }
-      };
-  }
-
-  public void buildTimerResendTransaction() {
-    timerTaskGateWay =
-      new TimerTask() {
-        @Override
-        public void run() {
-          Logger log = Logger.getLogger(Balancer.class.getName());
-
-          timerPass = timerPass + 1;
-          log.info(String.valueOf(timerPass));
-
-          if ((timerPass * 1000) >= TIMEOUT_GATEWAY) {
-            resendTransaction();
-            timerTaskGateWay.cancel();
-            log.info("TIME'S UP");
-          }
-        }
-      };
-  }
-
-  public void setPublisher(IPublisher iPublisher) {
-    this.iPublisher = iPublisher;
-  }
-
-  public void setDeviceManager(IDevicePropertiesManager deviceManager) {
-    this.deviceManager = deviceManager;
-  }
-
-  public void setConnector(LedgerConnector connector) {
-    this.connector = connector;
-  }
-
-  public void setIdManager(IIDManagerService idManager) {
-    this.idManager = idManager;
-  }
-
-  public void setGroupManager(IDLTGroupManager groupManager) {
-    this.groupManager = groupManager;
-  }
-
-  public void setSubscribedTopics(String topicsJSON) {
-    this.log.info("Set topics: " + topicsJSON);
-
-    this.subscribedTopics =
-      new JSONArray(topicsJSON)
-        .toList()
-        .stream()
-        .filter(String.class::isInstance)
-        .map(String.class::cast)
-        .collect(toList());
-  }
-
-  public void start() {
-    this.executor.scheduleAtFixedRate(this, 0, 5, TimeUnit.SECONDS);
-  }
-
-  public void stop() {
-    this.flagSubscribe = true;
-
-    this.subscribedTopics.forEach(
-        topic -> this.connector.unsubscribe(topic, this)
-      );
-
-    this.executor.shutdown();
-
-    try {
-      if (
-        this.executor.awaitTermination(500, TimeUnit.MILLISECONDS) &&
-        !this.executor.isShutdown()
-      ) {
-        this.executor.shutdownNow();
-      }
-    } catch (InterruptedException ex) {
-      this.executor.shutdownNow();
-    }
-  }
-
-  private void messageArrived(Transaction transaction) {
-    this.log.info("Waiting for LB_ENTRY");
-    this.log.info("Load  - Last transaction is Null");
-
-    if (
-      transaction.getType().equals(TransactionType.LB_STATUS) &&
-      transaction.getSource().equals(this.buildSource())
-    ) {
-      this.lastStatus = (Status) transaction;
+        this.executor = Executors.newSingleThreadScheduledExecutor();
     }
 
-    if (transaction.getType().equals(TransactionType.LB_ENTRY)) {
-      if (transaction.getSource().equals(this.buildSource())) {
-        // Definindo minha última transação enviada.
-        this.lastTransaction = transaction;
+    public void buildTimerResendTransaction() {
+        timerTaskGateWay
+                = new TimerTask() {
+            @Override
+            public void run() {
+                Logger log = Logger.getLogger(Balancer.class.getName());
 
-        executeTimeOutLB();
-      } else {
-        // Caso seja de outro gateway.
-        this.log.info("Receive: " + TransactionType.LB_ENTRY);
+                timerPass = timerPass + 1;
+                log.info(String.valueOf(timerPass));
 
+                if ((timerPass * 1000) >= TIMEOUT_GATEWAY) {
+                    resendTransaction();
+                    timerTaskGateWay.cancel();
+                    log.info("TIME'S UP");
+                }
+            }
+        };
+    }
+
+    public void setPublisher(IPublisher iPublisher) {
+        this.publisher = iPublisher;
+    }
+
+    public void setDeviceManager(IDevicePropertiesManager deviceManager) {
+        this.deviceManager = deviceManager;
+    }
+
+    public void setConnector(LedgerConnector connector) {
+        this.connector = connector;
+    }
+
+    public void setIdManager(IIDManagerService idManager) {
+        this.idManager = idManager;
+    }
+
+    public void setGroupManager(IDLTGroupManager groupManager) {
+        this.groupManager = groupManager;
+    }
+
+    public void setSubscribedTopics(String topicsJSON) {
+        logger.log(Level.INFO, "Set topics: {0}", topicsJSON);
+
+        this.subscribedTopics
+                = new JSONArray(topicsJSON)
+                        .toList()
+                        .stream()
+                        .filter(String.class::isInstance)
+                        .map(String.class::cast)
+                        .collect(toList());
+    }
+
+    public void start() {
+        this.executor.scheduleAtFixedRate(this, 0, 5, TimeUnit.SECONDS);
+    }
+
+    public void stop() {
+        this.flagSubscribe = true;
+
+        this.subscribedTopics
+                .forEach(topic -> this.connector.unsubscribe(topic, this));
+
+        this.executor.shutdown();
+
+        try {
+            if (this.executor.awaitTermination(500, TimeUnit.MILLISECONDS)
+                    && !this.executor.isShutdown()) {
+                this.executor.shutdownNow();
+            }
+        } catch (InterruptedException ex) {
+            this.executor.shutdownNow();
+        }
+    }
+
+    private boolean currentGatewayIsTarget(Transaction transaction) {
+        if (transaction == null) {
+            logger.warning("The transaction cannot be null.");
+            return false;
+        }
+        if (!(transaction instanceof TargetedTransaction)) {
+            String message = "The new transaction {0} is not a targeted transaction. Therefore it's impossible evaluate the target";
+            logger.log(Level.WARNING, message, transaction.getClass().getName());
+            return false;
+        }
+        return ((TargetedTransaction) transaction).getTarget().equals(this.buildSource());
+    }
+
+    private void messageArrived(Transaction transaction) {
+        boolean isStatusTransaction = transaction.getType().equals(TransactionType.LB_STATUS);
+        boolean isLoopbackMessage = transaction.getSource().equals(this.buildSource());
+        if (isStatusTransaction && isLoopbackMessage) {
+            logger.info("Load balancer - The new message is a status loopback.");
+            this.lastStatus = (Status) transaction;
+        }
+        logger.info("Waiting for LB_ENTRY");
+        TransactionType transactionType = transaction.getType();
+        if (!transactionType.equals(TransactionType.LB_ENTRY)) {
+            logger.log(Level.INFO, "Load balancer - The transaction type is {0}", transactionType);
+            return;
+        }
+        if (isLoopbackMessage) {// Definindo minha última transação enviada.
+            logger.info("Load balancer - The type message is LB_ENTRY and it's a loopback.");
+            this.lastTransaction = transaction;
+            executeTimeOutLB();
+            return;
+        }
+        logger.info("Load balancer - The type of new message is LB_ENTRY and is from another gateway");
         // Verificando a própria disponibilidade.
-        if (this.lastStatus.getAvaible()) {
-          String source = this.buildSource();
-          String group = this.groupManager.getGroup();
-          String newTarget = transaction.getSource();
-
-          Transaction transactionReply = new LBReply(source, group, newTarget);
-          this.sendTransaction(transactionReply);
+        if (!this.lastStatus.getAvaible()) { //Considerar recuperar essa informação direto do monitor
+            logger.info("Load balancer - This gateway is not availabe to receive new devices.");
+            return;
         }
-      }
+        String source = this.buildSource();
+        String group = this.groupManager.getGroup();
+        String newTarget = transaction.getSource();
+
+        Transaction transactionReply = new LBReply(source, group, newTarget);
+        this.sendTransaction(transactionReply);
     }
-  }
 
-  private void processTransactions(Transaction transaction) {
-    this.log.info("processing transaction...");
+    private void processWhenLastTransactionIsLBEntry(Transaction transaction) {
+        boolean isEntryReply = transaction.getType().equals(TransactionType.LB_ENTRY_REPLY);
+        if (!isEntryReply) {
+            String message = "The new transaction [{0}] will not be processed. Because is not LB_ENTRY_REPLY";
+            logger.log(Level.WARNING, message, transaction.getType());
+            return;
+        }
+        if (this.currentGatewayIsTarget(transaction)) {
+            logger.info("The new transaction will not be processed. Because the current gateway is not the target.");
+            return;
+        }
+        logger.log(Level.INFO, "Processing the new transaction [{0}].", transaction.getType());
+        timerTaskLb.cancel();
+        // Enviar LB_REQUEST.
+        Device deviceToSend;
+        try {
+            deviceToSend = this.deviceManager.getAllDevices().get(0);
+        } catch (IOException ioe) {
+            logger.info("Load Balancer - Error! Unable to retrieve device list.");
+            logger.log(Level.SEVERE, null, ioe);
+            return;
+        }
 
-    // Somente se as transações recebidas não forem enviadas pelo próprio gateway.
-    if (!transaction.getSource().equals(this.buildSource())) {
-      switch (lastTransaction.getType()) {
-        case LB_ENTRY:
-          if (
-            transaction.getType().equals(TransactionType.LB_ENTRY_REPLY) &&
-            ((TargetedTransaction) transaction).getTarget()
-              .equals(this.buildSource())
-          ) {
-            timerTaskLb.cancel();
+        String source = this.buildSource();
+        String group = this.groupManager.getGroup();
+        String newTarget = transaction.getSource();
+        String deviceStringToSend = DeviceWrapper.toJSON(deviceToSend);
+        this.lastRemovedDevice = deviceStringToSend;
 
-            String source = this.buildSource();
-            String group = this.groupManager.getGroup();
-            String newTarget = transaction.getSource();
-
-            // Enviar LB_REQUEST.
-            try {
-              Device deviceToSend = this.deviceManager.getAllDevices().get(0);
-              String deviceStringToSend = DeviceWrapper.toJSON(deviceToSend);
-              this.lastRemovedDevice = deviceStringToSend;
-
-              Transaction transactionRequest = new Request(
+        Transaction transactionRequest = new Request(
                 source,
                 group,
                 deviceStringToSend,
                 newTarget
-              );
-              this.sendTransaction(transactionRequest);
+        );
+        this.sendTransaction(transactionRequest);
+        this.startLBReplyTimeout();
 
-              executeTimeOutGateWay();
-            } catch (IOException ioe) {
-              this.log.info(
-                "Load Balancer - Error! Unable to retrieve device list."
-              );
-              ioe.printStackTrace();
-            }
-          }
+    }
 
-          break;
-        case LB_ENTRY_REPLY:
-          if (
-            transaction.getType().equals(TransactionType.LB_REQUEST) &&
-            ((TargetedTransaction) transaction).getTarget()
-              .equals((this.buildSource()))
-          ) {
-            timerTaskGateWay.cancel();
+    private void processWhenLastTransactionIsLBEntryReply(Transaction transaction) {
+        boolean isLBRequest = transaction.getType().equals(TransactionType.LB_REQUEST);
+        if (!isLBRequest) {
+            String message = "The new transaction [{0}] will not be processed. Because is not LB_REQUEST";
+            logger.log(Level.WARNING, message, transaction.getType());
+            return;
+        }
+        if (!this.currentGatewayIsTarget(transaction)) {
+            logger.info("The new transaction will not be processed. Because the current gateway is not the target.");
+            return;
+        }
+        logger.log(Level.INFO, "Processing the new transaction [{0}].", transaction.getType());
+        timerTaskGateWay.cancel();
 
-            String source = this.buildSource();
-            String group = this.groupManager.getGroup();
-            String newTarget = transaction.getSource();
+        // Carregar dispositivo na lista.
+        String device = ((Request) transaction).getDevice();
+        this.loadSwapReceberDispositivo(device);
 
-            // Carregar dispositivo na lista.
-            String device = ((Request) transaction).getDevice();
-            this.loadSwapReceberDispositivo(device);
+        String source = this.buildSource();
+        String group = this.groupManager.getGroup();
+        String newTarget = transaction.getSource();
+        // Enviar LB_REPLY.
+        Transaction transactionReply = new Reply(source, group, newTarget);
+        this.sendTransaction(transactionReply);
 
-            // Enviar LB_REPLY.
-            Transaction transactionReply = new Reply(source, group, newTarget);
-            this.sendTransaction(transactionReply);
+        // Colocar para a última transação ser nula.
+        this.lastTransaction = null;
+    }
 
-            // Colocar para a última transação ser nula.
-            this.lastTransaction = null;
-          }
+    public void processWhenLastTransactionIsLBRequest(Transaction transaction) {
+        boolean isLBReply = transaction.getType().equals(TransactionType.LB_REPLY);
+        if (!isLBReply) {
+            String message = "The new transaction [{0}] will not be processed. Because is not LB_REQUEST";
+            logger.log(Level.WARNING, message, transaction.getType());
+            return;
+        }
+        if (!this.currentGatewayIsTarget(transaction)) {
+            logger.info("The new transaction will not be processed. Because the current gateway is not the target.");
+            return;
+        }
+        logger.log(Level.INFO, "Processing the new transaction [{0}].", transaction.getType());
+        timerTaskGateWay.cancel();
 
-          break;
-        case LB_REQUEST:
-          if (
-            transaction.getType().equals(TransactionType.LB_REPLY) &&
-            ((TargetedTransaction) transaction).getTarget()
-              .equals((this.buildSource()))
-          ) {
-            timerTaskGateWay.cancel();
+        try {
+            this.removeFirstDevice(transaction.getSource().split("/")[2]);
+        } catch (MqttException me) {
+            logger.info("Load Balancer - Error! Unable to remove the first device.");
+            logger.log(Level.SEVERE, null, me);
+            return;
+        }
+        String source = this.buildSource();
+        String group = this.groupManager.getGroup();
+        String newTarget = transaction.getSource();
 
-            String source = this.buildSource();
-            String group = this.groupManager.getGroup();
-            String newTarget = transaction.getSource();
-
-            try {
-              this.removeFirstDevice(transaction.getSource().split("/")[2]);
-
-              // Enviar LBDevice.
-              Transaction transactionDevice = new LBDevice(
+        // Enviar LBDevice.
+        Transaction transactionDevice = new LBDevice(
                 source,
                 group,
                 this.lastRemovedDevice,
                 newTarget
-              );
-
-              this.sendTransaction(transactionDevice);
-
-              // Colocar para a última transação ser nula.
-              this.lastTransaction = null;
-            } catch (MqttException me) {
-              this.log.info(
-                "Load Balancer - Error! Unable to remove the first device."
-              );
-              me.printStackTrace();
-            }
-          }
-
-          break;
-        default:
-          this.log.info("Error! Something went wrong.");
-
-          break;
-      }
-    }
-  }
-
-  private void executeTimeOutGateWay() {
-    timerTaskGateWay =
-      new TimerTask() {
-        @Override
-        public void run() {
-          Logger log = Logger.getLogger(Balancer.class.getName());
-
-          timerPass = timerPass + 1;
-          log.info(String.valueOf(timerPass));
-
-          if ((timerPass * 1000) >= TIMEOUT_LB_REPLY) {
-            lastTransaction = null;
-            timerTaskGateWay.cancel();
-            log.info("TIME'S UP");
-          }
-        }
-      };
-
-    timerPass = 0;
-    Timer timer = new Timer();
-    timer.scheduleAtFixedRate(timerTaskGateWay, 1000, 1000);
-  }
-
-  private void executeTimeOutLB() {
-    timerTaskLb =
-      new TimerTask() {
-        @Override
-        public void run() {
-          Logger log = Logger.getLogger(Balancer.class.getName());
-
-          timerPass = timerPass + 1;
-          log.info(String.valueOf(timerPass));
-
-          if ((timerPass * 1000) >= TIMEOUT_LB_REPLY) {
-            lastTransaction = null;
-            timerTaskLb.cancel();
-            log.info("TIME'S UP");
-          }
-        }
-      };
-
-    timerPass = 0;
-    Timer timer = new Timer();
-    timer.scheduleAtFixedRate(timerTaskLb, 1000, 1000);
-  }
-
-  private void sendTransaction(Transaction transaction) {
-    try {
-      this.connector.put(transaction);
-
-      this.lastTransaction = transaction;
-    } catch (InterruptedException ie) {
-      this.log.info("Load Balancer - Error commit transaction.");
-      ie.printStackTrace();
-    }
-  }
-
-  private void resendTransaction() {
-    try {
-      this.resent += 1;
-      if (this.resent == 3) {
-        this.lastTransaction = null;
-        this.resent = 0;
-        return;
-      }
-
-      this.connector.put(lastTransaction);
-      Timer timer = new Timer();
-      timerPass = 0;
-      timer.scheduleAtFixedRate(timerTaskLb, 1000, 1000);
-    } catch (InterruptedException ie) {
-      this.log.info("Load Balancer - Error commit transaction.");
-      ie.printStackTrace();
-    }
-  }
-
-  private String buildSource() {
-    return new StringBuilder(this.groupManager.getGroup())
-      .append("/")
-      .append(this.idManager.getIP())
-      .toString();
-  }
-
-  public void removeFirstDevice(String targetIp) throws MqttException {
-    try {
-      List<Device> allDevices = deviceManager.getAllDevices();
-
-      if (!allDevices.isEmpty()) {
-        Device deviceARemover = allDevices.get(0);
-        JsonObject jsonPublish = new JsonObject();
-        jsonPublish.addProperty("id", deviceARemover.getId());
-        jsonPublish.addProperty("url", "tcp://" + targetIp);
-        jsonPublish.addProperty("port", deviceARemover.getId());
-        jsonPublish.addProperty("user", "karaf");
-        jsonPublish.addProperty("password", "karaf");
-
-        iPublisher.publish(
-          deviceARemover.getId(),
-          "SET VALUE brokerMqtt{" + jsonPublish.toString() + "}"
         );
 
-        deviceManager.removeDevice(allDevices.get(0).getId());
-      }
-    } catch (IOException ioe) {
-      this.log.info(
-        "Error! To retrieve device list or to remove the first device."
-      );
-      ioe.printStackTrace();
+        this.sendTransaction(transactionDevice);
+
+        // Colocar para a última transação ser nula.
+        this.lastTransaction = null;
+
     }
-  }
 
-  public void loadSwapReceberDispositivo(String deviceJSON) {
-    try {
-      this.log.info("DeviceJSON: " + deviceJSON);
-
-      Device device = DeviceWrapper.toDevice(deviceJSON);
-      this.log.info(
-        "Device after convert: " + DeviceWrapper.toJSON(device)
-      );
-
-      deviceManager.addDevice(device);
-    } catch (IOException ioe) {
-      this.log.info("Error! To add a new device to the list.");
-      ioe.printStackTrace();
-    }
-  }
-
-  public void stopTimeout() {
-    while (!executorTimeout.isShutdown());
-  }
-
-  @Override
-  public void update(Object object) {
-    if (object instanceof String) {
-      this.log.info("Load balancer - New message - Valid");
-
-      String hashTransaction = (String) object;
-
-      this.log.info("HashTransaction: " + hashTransaction);
-
-      Transaction transaction =
-        this.connector.getTransactionByHash(hashTransaction);
-
-      if (
-        transaction != null &&
-        System.currentTimeMillis() - transaction.getPublishedAt() < 15000 // Evitar o processamento de mensagens antigas.
-      ) {
-        if (lastTransaction != null) {
-          this.processTransactions(transaction);
-        } else {
-          this.messageArrived(transaction);
+    private void processTransactions(Transaction transaction) {
+        logger.info("Load balancer - Processing the new transaction");
+        logger.log(Level.INFO, "Load balancer - The last transaction type is {0}", lastTransaction.getType());
+        switch (lastTransaction.getType()) {
+            case LB_ENTRY:
+                this.processWhenLastTransactionIsLBEntry(transaction);
+                break;
+            case LB_ENTRY_REPLY:
+                this.processWhenLastTransactionIsLBEntryReply(transaction);
+                break;
+            case LB_REQUEST:
+                this.processWhenLastTransactionIsLBRequest(transaction);
+                break;
+            default:
+                logger.info("Error! Something went wrong. - Default case");
+                break;
         }
-      }
-    } else {
-      this.log.info("Load balancer - New message - Invalid");
     }
-  }
 
-  /* Thread para verificar o IP do client tangle e se inscrever nos tópicos
+    private void startLBReplyTimeout() {
+        timerTaskGateWay
+                = new TimerTask() {
+            @Override
+            public void run() {
+                Logger log = Logger.getLogger(Balancer.class.getName());
+
+                timerPass = timerPass + 1;
+                log.info(String.valueOf(timerPass));
+
+                if ((timerPass * 1000) >= TIMEOUT_LB_REPLY) {
+                    lastTransaction = null;
+                    timerTaskGateWay.cancel();
+                    log.info("TIME'S UP");
+                }
+            }
+        };
+
+        timerPass = 0;
+        Timer timer = new Timer();
+        timer.scheduleAtFixedRate(timerTaskGateWay, 1000, 1000);
+    }
+
+    private void executeTimeOutLB() {
+        timerTaskLb
+                = new TimerTask() {
+            @Override
+            public void run() {
+                Logger log = Logger.getLogger(Balancer.class.getName());
+
+                timerPass = timerPass + 1;
+                log.info(String.valueOf(timerPass));
+
+                if ((timerPass * 1000) >= TIMEOUT_LB_REPLY) {
+                    lastTransaction = null;
+                    timerTaskLb.cancel();
+                    log.info("TIME'S UP");
+                }
+            }
+        };
+
+        timerPass = 0;
+        Timer timer = new Timer();
+        timer.scheduleAtFixedRate(timerTaskLb, 1000, 1000);
+    }
+
+    private void sendTransaction(Transaction transaction) {
+        try {
+            this.connector.put(transaction);
+
+            this.lastTransaction = transaction;
+        } catch (InterruptedException ie) {
+            logger.info("Load Balancer - Error commit transaction.");
+            logger.log(Level.SEVERE, null, ie);
+        }
+    }
+
+    private void resendTransaction() {
+        try {
+            this.resent += 1;
+            if (this.resent == 3) {
+                this.lastTransaction = null;
+                this.resent = 0;
+                return;
+            }
+
+            this.connector.put(lastTransaction);
+            Timer timer = new Timer();
+            timerPass = 0;
+            timer.scheduleAtFixedRate(timerTaskLb, 1000, 1000);
+        } catch (InterruptedException ie) {
+            logger.info("Load Balancer - Error commit transaction.");
+            logger.log(Level.SEVERE, null, ie);
+        }
+    }
+
+    private String buildSource() {
+        return new StringBuilder(this.groupManager.getGroup())
+                .append("/")
+                .append(this.idManager.getIP())
+                .toString();
+    }
+
+    public void removeFirstDevice(String targetIp) throws MqttException {
+        try {
+            List<Device> allDevices = deviceManager.getAllDevices();
+
+            if (allDevices.isEmpty()) {
+                logger.warning("Load balancer - It's not possible to remove device. Because there is note devices in this gateway.");
+                return;
+            }
+            Device deviceARemover = allDevices.get(0);
+            JsonObject jsonPublish = new JsonObject();
+            jsonPublish.addProperty("id", deviceARemover.getId());
+            jsonPublish.addProperty("url", "tcp://" + targetIp);
+            jsonPublish.addProperty("port", deviceARemover.getId());
+            jsonPublish.addProperty("user", "karaf");
+            jsonPublish.addProperty("password", "karaf");
+
+            String response = "SET VALUE brokerMqtt{" + jsonPublish.toString() + "}";
+            publisher.publish(deviceARemover.getId(), response);
+
+            deviceManager.removeDevice(allDevices.get(0).getId());
+        } catch (IOException ioe) {
+            logger.info("Error! To retrieve device list or to remove the first device.");
+            logger.log(Level.SEVERE, null, ioe);
+        }
+    }
+
+    public void loadSwapReceberDispositivo(String deviceJSON) {
+        logger.info("Load balancer - Receiving new device");
+        logger.log(Level.INFO, "DeviceJSON: {0}", deviceJSON);
+        Device device = DeviceWrapper.toDevice(deviceJSON);
+        logger.log(Level.INFO, "Device after convert: {0}", DeviceWrapper.toJSON(device));
+        try {
+            deviceManager.addDevice(device);
+            logger.info("Load balancer - New device successfully added.");
+        } catch (IOException ioe) {
+            logger.info("Error! To add a new device to the list.");
+            logger.log(Level.SEVERE, null, ioe);
+        }
+    }
+
+    @Override
+    public void update(Object object) {
+        if (object == null) {
+            logger.warning("Load balancer - New message - The message is null.");
+            return;
+        }
+        if (!(object instanceof String)) {
+            logger.warning("Load balancer - New message - Is not String type");
+            String messageType = object.getClass().getName();
+            logger.log(Level.WARNING, "Load balancer - New message - message type: {0}", messageType);
+            return;
+        }
+        String hashTransaction = (String) object;
+
+        Transaction transaction = this.connector.getTransactionByHash(hashTransaction);
+        if (!this.isRecentTransaction(transaction)) {
+            logger.warning("Load balancer - The received message is old");
+            return;
+        }
+
+        logger.info("Load balancer - New message - Valid");
+        logger.log(Level.INFO, "HashTransaction: {0}", hashTransaction);
+
+        if (lastTransaction == null) {
+            logger.info("Load balancer - Last transaction is Null");
+            this.messageArrived(transaction);
+            return;
+        }
+        boolean isLoopbackMessage = transaction.getSource().equals(this.buildSource());
+        if (isLoopbackMessage) {
+            logger.info("The new message will not be processed. because is a loopback.");
+            return;
+        }
+        // Apenas processar mensagens de outros gateways
+        this.processTransactions(transaction);
+    }
+
+    private boolean isRecentTransaction(Transaction transaction) {
+        return System.currentTimeMillis() - transaction.getPublishedAt() < 15000;
+    }
+
+    /* Thread para verificar o IP do client tangle e se inscrever nos tópicos
     de interesse.*/
-  @Override
-  public void run() {
-    try {
-      InetAddress inet = InetAddress.getByName(
-        this.connector.getLedgerWriter().getUrl()
-      );
+    @Override
+    public void run() {
+        try {
+            String url = this.connector.getLedgerWriter().getUrl();
+            InetAddress inet = InetAddress.getByName(url);
 
-      if (inet.isReachable(3000)) {
-        if (this.flagSubscribe) {
-          this.subscribedTopics.forEach(
-              topic -> this.connector.subscribe(topic, this)
-            );
+            if (!inet.isReachable(3000)) {
+                this.flagSubscribe = true;
+                return;
+            }
+            if (!this.flagSubscribe) {
+                return;
+            }
+            this.subscribedTopics
+                    .forEach(topic -> this.connector.subscribe(topic, this));
+            this.flagSubscribe = false;
 
-          this.flagSubscribe = false;
+        } catch (UnknownHostException ex) {
+            logger.info("Error! Unknown Host.");
+            logger.log(Level.SEVERE, null, ex);
+        } catch (IOException ex) {
+            logger.info("Error! Can't connect to InetAddress.");
+            logger.log(Level.SEVERE, null, ex);
         }
-      } else {
-        this.flagSubscribe = true;
-      }
-    } catch (UnknownHostException uhe) {
-      this.log.info("Error! Unknown Host.");
-      uhe.printStackTrace();
-    } catch (IOException ioe) {
-      this.log.info("Error! Can't connect to InetAddress.");
-      ioe.printStackTrace();
     }
-  }
 }

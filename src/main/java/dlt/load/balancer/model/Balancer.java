@@ -53,7 +53,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
     private IDLTGroupManager groupManager;
     private IPublisher publisher;
     
-    private int timerPass, resent;
+    private int timerPass, resend;
     private Status lastStatus;
     private String lastRemovedDevice;
     private boolean flagSubscribe;
@@ -64,7 +64,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
         this.TIMEOUT_GATEWAY = timeoutGateway;
 
         this.buildTimerResendTransaction();
-        this.resent = 0;
+        this.resend = 0;
         this.lastStatus = null;
         this.flagSubscribe = true;
 
@@ -72,8 +72,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
     }
 
     public void buildTimerResendTransaction() {
-        timerTaskGateWay
-                = new TimerTask() {
+        timerTaskGateWay = new TimerTask() {
             @Override
             public void run() {
                 Logger log = Logger.getLogger(Balancer.class.getName());
@@ -88,6 +87,28 @@ public class Balancer implements ILedgerSubscriber, Runnable {
                 }
             }
         };
+    }
+   
+    private void startLBReplyTimeout() {
+        timerTaskGateWay = new TimerTask() {
+            @Override
+            public void run() {
+                Logger log = Logger.getLogger(Balancer.class.getName());
+
+                timerPass = timerPass + 1;
+                log.info(String.valueOf(timerPass));
+
+                if ((timerPass * 1000) >= TIMEOUT_LB_REPLY) {
+                    lastTransaction = null;
+                    timerTaskGateWay.cancel();
+                    log.info("TIME'S UP");
+                }
+            }
+        };
+        
+        timerPass = 0;
+        Timer timer = new Timer();
+        timer.scheduleAtFixedRate(timerTaskGateWay, 1000, 1000);
     }
 
     public void setPublisher(IPublisher iPublisher) {
@@ -197,7 +218,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
             logger.log(Level.WARNING, message, transaction.getType());
             return;
         }
-        if (this.currentGatewayIsTarget(transaction)) {
+        if (!this.currentGatewayIsTarget(transaction)) {
             logger.info("The new transaction will not be processed. Because the current gateway is not the target.");
             return;
         }
@@ -246,7 +267,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
 
         // Carregar dispositivo na lista.
         String device = ((Request) transaction).getDevice();
-        this.loadSwapReceberDispositivo(device);
+        this.loadSwapToReceiveDevice(device);
 
         String source = this.buildSource();
         String group = this.groupManager.getGroup();
@@ -318,32 +339,8 @@ public class Balancer implements ILedgerSubscriber, Runnable {
         }
     }
 
-    private void startLBReplyTimeout() {
-        timerTaskGateWay
-                = new TimerTask() {
-            @Override
-            public void run() {
-                Logger log = Logger.getLogger(Balancer.class.getName());
-
-                timerPass = timerPass + 1;
-                log.info(String.valueOf(timerPass));
-
-                if ((timerPass * 1000) >= TIMEOUT_LB_REPLY) {
-                    lastTransaction = null;
-                    timerTaskGateWay.cancel();
-                    log.info("TIME'S UP");
-                }
-            }
-        };
-
-        timerPass = 0;
-        Timer timer = new Timer();
-        timer.scheduleAtFixedRate(timerTaskGateWay, 1000, 1000);
-    }
-
     private void executeTimeOutLB() {
-        timerTaskLb
-                = new TimerTask() {
+        timerTaskLb = new TimerTask() {
             @Override
             public void run() {
                 Logger log = Logger.getLogger(Balancer.class.getName());
@@ -354,7 +351,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
                 if ((timerPass * 1000) >= TIMEOUT_LB_REPLY) {
                     lastTransaction = null;
                     timerTaskLb.cancel();
-                    log.info("TIME'S UP");
+                    log.info("TIME'S UP"); //In this point a multibalancer shoud be started.
                 }
             }
         };
@@ -377,10 +374,10 @@ public class Balancer implements ILedgerSubscriber, Runnable {
 
     private void resendTransaction() {
         try {
-            this.resent += 1;
-            if (this.resent == 3) {
+            this.resend += 1;
+            if (this.resend == 3) {
                 this.lastTransaction = null;
-                this.resent = 0;
+                this.resend = 0;
                 return;
             }
 
@@ -427,7 +424,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
         }
     }
 
-    public void loadSwapReceberDispositivo(String deviceJSON) {
+    public void loadSwapToReceiveDevice(String deviceJSON) {
         logger.info("Load balancer - Receiving new device");
         logger.log(Level.INFO, "DeviceJSON: {0}", deviceJSON);
         Device device = DeviceWrapper.toDevice(deviceJSON);

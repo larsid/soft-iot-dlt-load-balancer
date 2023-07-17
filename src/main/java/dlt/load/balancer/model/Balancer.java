@@ -31,6 +31,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.json.JSONArray;
+import java.util.logging.Logger;
 
 /**
  *
@@ -56,6 +57,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
   private Status lastStatus;
   private String lastRemovedDevice;
   private boolean flagSubscribe;
+  private Logger log;
 
   final Duration timeout = Duration.ofSeconds(40);
   ExecutorService executorTimeout = Executors.newSingleThreadExecutor();
@@ -70,6 +72,8 @@ public class Balancer implements ILedgerSubscriber, Runnable {
     this.flagSubscribe = true;
 
     this.executor = Executors.newSingleThreadScheduledExecutor();
+
+    this.log = Logger.getLogger(Balancer.class.getName());
   }
 
   public void buildTimerTaskLB() {
@@ -77,13 +81,15 @@ public class Balancer implements ILedgerSubscriber, Runnable {
       new TimerTask() {
         @Override
         public void run() {
+          Logger log = Logger.getLogger(Balancer.class.getName());
+          
           timerPass = timerPass + 1;
-          System.out.println(timerPass);
+          log.info(String.valueOf(timerPass));
 
           if ((timerPass * 1000) >= TIMEOUT_LB_REPLY) {
             lastTransaction = null;
             timerTaskLb.cancel();
-            System.out.println("TIME'S UP");
+            log.info("TIME'S UP");
           }
         }
       };
@@ -94,13 +100,15 @@ public class Balancer implements ILedgerSubscriber, Runnable {
       new TimerTask() {
         @Override
         public void run() {
+          Logger log = Logger.getLogger(Balancer.class.getName());
+
           timerPass = timerPass + 1;
-          System.out.println(timerPass);
+          log.info(String.valueOf(timerPass));
 
           if ((timerPass * 1000) >= TIMEOUT_GATEWAY) {
             resendTransaction();
             timerTaskGateWay.cancel();
-            System.out.println("TIME'S UP");
+            log.info("TIME'S UP");
           }
         }
       };
@@ -127,7 +135,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
   }
 
   public void setSubscribedTopics(String topicsJSON) {
-    System.out.println("Set topics: " + topicsJSON);
+    this.log.info("Set topics: " + topicsJSON);
 
     this.subscribedTopics =
       new JSONArray(topicsJSON)
@@ -164,8 +172,8 @@ public class Balancer implements ILedgerSubscriber, Runnable {
   }
 
   private void messageArrived(Transaction transaction) {
-    System.out.println("Waiting for LB_ENTRY");
-    System.out.println("Load  - Last transaction is Null");
+    this.log.info("Waiting for LB_ENTRY");
+    this.log.info("Load  - Last transaction is Null");
 
     if (
       transaction.getType().equals(TransactionType.LB_STATUS) &&
@@ -182,7 +190,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
         executeTimeOutLB();
       } else {
         // Caso seja de outro gateway.
-        System.out.println("Receive: " + TransactionType.LB_ENTRY);
+        this.log.info("Receive: " + TransactionType.LB_ENTRY);
 
         // Verificando a própria disponibilidade.
         if (this.lastStatus.getAvaible()) {
@@ -198,7 +206,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
   }
 
   private void processTransactions(Transaction transaction) {
-    System.out.println("processing transaction...");
+    this.log.info("processing transaction...");
 
     // Somente se as transações recebidas não forem enviadas pelo próprio gateway.
     if (!transaction.getSource().equals(this.buildSource())) {
@@ -231,7 +239,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
 
               executeTimeOutGateWay();
             } catch (IOException ioe) {
-              System.out.println(
+              this.log.info(
                 "Load Balancer - Error! Unable to retrieve device list."
               );
               ioe.printStackTrace();
@@ -292,7 +300,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
               // Colocar para a última transação ser nula.
               this.lastTransaction = null;
             } catch (MqttException me) {
-              System.out.println(
+              this.log.info(
                 "Load Balancer - Error! Unable to remove the first device."
               );
               me.printStackTrace();
@@ -301,7 +309,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
 
           break;
         default:
-          System.out.println("Error! Something went wrong.");
+          this.log.info("Error! Something went wrong.");
 
           break;
       }
@@ -313,13 +321,15 @@ public class Balancer implements ILedgerSubscriber, Runnable {
       new TimerTask() {
         @Override
         public void run() {
+          Logger log = Logger.getLogger(Balancer.class.getName());
+
           timerPass = timerPass + 1;
-          System.out.println(timerPass);
+          log.info(String.valueOf(timerPass));
 
           if ((timerPass * 1000) >= TIMEOUT_LB_REPLY) {
             lastTransaction = null;
             timerTaskGateWay.cancel();
-            System.out.println("TIME'S UP");
+            log.info("TIME'S UP");
           }
         }
       };
@@ -334,13 +344,15 @@ public class Balancer implements ILedgerSubscriber, Runnable {
       new TimerTask() {
         @Override
         public void run() {
+          Logger log = Logger.getLogger(Balancer.class.getName());
+
           timerPass = timerPass + 1;
-          System.out.println(timerPass);
+          log.info(String.valueOf(timerPass));
 
           if ((timerPass * 1000) >= TIMEOUT_LB_REPLY) {
             lastTransaction = null;
             timerTaskLb.cancel();
-            System.out.println("TIME'S UP");
+            log.info("TIME'S UP");
           }
         }
       };
@@ -356,7 +368,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
 
       this.lastTransaction = transaction;
     } catch (InterruptedException ie) {
-      System.out.println("Load Balancer - Error commit transaction.");
+      this.log.info("Load Balancer - Error commit transaction.");
       ie.printStackTrace();
     }
   }
@@ -375,7 +387,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
       timerPass = 0;
       timer.scheduleAtFixedRate(timerTaskLb, 1000, 1000);
     } catch (InterruptedException ie) {
-      System.out.println("Load Balancer - Error commit transaction.");
+      this.log.info("Load Balancer - Error commit transaction.");
       ie.printStackTrace();
     }
   }
@@ -408,7 +420,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
         deviceManager.removeDevice(allDevices.get(0).getId());
       }
     } catch (IOException ioe) {
-      System.out.println(
+      this.log.info(
         "Error! To retrieve device list or to remove the first device."
       );
       ioe.printStackTrace();
@@ -417,16 +429,16 @@ public class Balancer implements ILedgerSubscriber, Runnable {
 
   public void loadSwapReceberDispositivo(String deviceJSON) {
     try {
-      System.out.println("DeviceJSON: " + deviceJSON);
+      this.log.info("DeviceJSON: " + deviceJSON);
 
       Device device = DeviceWrapper.toDevice(deviceJSON);
-      System.out.println(
+      this.log.info(
         "Device after convert: " + DeviceWrapper.toJSON(device)
       );
 
       deviceManager.addDevice(device);
     } catch (IOException ioe) {
-      System.out.println("Error! To add a new device to the list.");
+      this.log.info("Error! To add a new device to the list.");
       ioe.printStackTrace();
     }
   }
@@ -438,11 +450,11 @@ public class Balancer implements ILedgerSubscriber, Runnable {
   @Override
   public void update(Object object) {
     if (object instanceof String) {
-      System.out.println("Load balancer - New message - Valid");
+      this.log.info("Load balancer - New message - Valid");
 
       String hashTransaction = (String) object;
 
-      System.out.println("HashTransaction: " + hashTransaction);
+      this.log.info("HashTransaction: " + hashTransaction);
 
       Transaction transaction =
         this.connector.getTransactionByHash(hashTransaction);
@@ -458,7 +470,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
         }
       }
     } else {
-      System.out.println("Load balancer - New message - Invalid");
+      this.log.info("Load balancer - New message - Invalid");
     }
   }
 
@@ -483,10 +495,10 @@ public class Balancer implements ILedgerSubscriber, Runnable {
         this.flagSubscribe = true;
       }
     } catch (UnknownHostException uhe) {
-      System.out.println("Error! Unknown Host.");
+      this.log.info("Error! Unknown Host.");
       uhe.printStackTrace();
     } catch (IOException ioe) {
-      System.out.println("Error! Can't connect to InetAddress.");
+      this.log.info("Error! Can't connect to InetAddress.");
       ioe.printStackTrace();
     }
   }

@@ -10,8 +10,8 @@
 
     <name>SOFT-IoT-DLT-Load-Balancer</name>
     <description>SOFT-IoT-Load-Balancer OSGi blueprint bundle project.</description>
-
     <url>https://github.com/larsid/soft-iot-dlt-load-balancer</url>
+
     <licenses>
         <license>
             <name>MIT License</name>
@@ -101,7 +101,7 @@
         <dependency>
             <groupId>org.json</groupId>
             <artifactId>json</artifactId>
-            <version>20200518</version>
+            <version>20230618</version>
             <scope>compile</scope>
         </dependency>
          <dependency>

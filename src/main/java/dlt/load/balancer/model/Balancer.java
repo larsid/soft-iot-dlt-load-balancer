@@ -29,14 +29,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Logger;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.json.JSONArray;
-import java.util.logging.Logger;
 
 /**
  *
  * @author  Allan Capistrano, Antonio Crispim, Uellington Damasceno
- * @version 0.0.2
+ * @version 0.0.3
  */
 public class Balancer implements ILedgerSubscriber, Runnable {
 
@@ -82,7 +82,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
         @Override
         public void run() {
           Logger log = Logger.getLogger(Balancer.class.getName());
-          
+
           timerPass = timerPass + 1;
           log.info(String.valueOf(timerPass));
 
@@ -153,8 +153,8 @@ public class Balancer implements ILedgerSubscriber, Runnable {
   public void stop() {
     this.flagSubscribe = true;
 
-    this.subscribedTopics.forEach(
-        topic -> this.connector.unsubscribe(topic, this)
+    this.subscribedTopics.forEach(topic ->
+        this.connector.unsubscribe(topic, this)
       );
 
     this.executor.shutdown();
@@ -218,6 +218,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
               .equals(this.buildSource())
           ) {
             timerTaskLb.cancel();
+            timerTaskGateWay.cancel();
 
             String source = this.buildSource();
             String group = this.groupManager.getGroup();
@@ -240,10 +241,14 @@ public class Balancer implements ILedgerSubscriber, Runnable {
               executeTimeOutGateWay();
             } catch (IOException ioe) {
               this.log.info(
-                "Load Balancer - Error! Unable to retrieve device list."
-              );
+                  "Load Balancer - Error! Unable to retrieve device list."
+                );
               ioe.printStackTrace();
             }
+          } else if (transaction.getType().equals(TransactionType.LB_ENTRY_REPLY) &&
+            !((TargetedTransaction) transaction).getTarget()
+              .equals(this.buildSource())) {
+            executeTimeOutGateWay();
           }
 
           break;
@@ -269,6 +274,10 @@ public class Balancer implements ILedgerSubscriber, Runnable {
 
             // Colocar para a última transação ser nula.
             this.lastTransaction = null;
+          } else if (transaction.getType().equals(TransactionType.LB_REQUEST) &&
+            !((TargetedTransaction) transaction).getTarget()
+              .equals(this.buildSource())) {
+            executeTimeOutGateWay();
           }
 
           break;
@@ -301,10 +310,14 @@ public class Balancer implements ILedgerSubscriber, Runnable {
               this.lastTransaction = null;
             } catch (MqttException me) {
               this.log.info(
-                "Load Balancer - Error! Unable to remove the first device."
-              );
+                  "Load Balancer - Error! Unable to remove the first device."
+                );
               me.printStackTrace();
             }
+          } else if (transaction.getType().equals(TransactionType.LB_REPLY) &&
+            !((TargetedTransaction) transaction).getTarget()
+              .equals(this.buildSource())) {
+            executeTimeOutGateWay();
           }
 
           break;
@@ -421,8 +434,8 @@ public class Balancer implements ILedgerSubscriber, Runnable {
       }
     } catch (IOException ioe) {
       this.log.info(
-        "Error! To retrieve device list or to remove the first device."
-      );
+          "Error! To retrieve device list or to remove the first device."
+        );
       ioe.printStackTrace();
     }
   }
@@ -432,9 +445,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
       this.log.info("DeviceJSON: " + deviceJSON);
 
       Device device = DeviceWrapper.toDevice(deviceJSON);
-      this.log.info(
-        "Device after convert: " + DeviceWrapper.toJSON(device)
-      );
+      this.log.info("Device after convert: " + DeviceWrapper.toJSON(device));
 
       deviceManager.addDevice(device);
     } catch (IOException ioe) {
@@ -485,8 +496,8 @@ public class Balancer implements ILedgerSubscriber, Runnable {
 
       if (inet.isReachable(3000)) {
         if (this.flagSubscribe) {
-          this.subscribedTopics.forEach(
-              topic -> this.connector.subscribe(topic, this)
+          this.subscribedTopics.forEach(topic ->
+              this.connector.subscribe(topic, this)
             );
 
           this.flagSubscribe = false;

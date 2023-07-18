@@ -193,7 +193,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
         this.log.info("Receive: " + TransactionType.LB_ENTRY);
 
         // Verificando a própria disponibilidade.
-        if (this.lastStatus.getAvaible()) {
+        if (this.lastStatus.getAvailable()) {
           String source = this.buildSource();
           String group = this.groupManager.getGroup();
           String newTarget = transaction.getSource();

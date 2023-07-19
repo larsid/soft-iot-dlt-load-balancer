@@ -89,7 +89,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
           if ((timerPass * 1000) >= TIMEOUT_LB_REPLY) {
             lastTransaction = null;
             timerTaskLb.cancel();
-            log.info("TIME'S UP");
+            log.info("TIME'S UP buildTimerTaskLB");
           }
         }
       };
@@ -108,7 +108,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
           if ((timerPass * 1000) >= TIMEOUT_GATEWAY) {
             resendTransaction();
             timerTaskGateWay.cancel();
-            log.info("TIME'S UP");
+            log.info("TIME'S UP buildTimerResendTransaction");
           }
         }
       };
@@ -238,6 +238,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
               );
               this.sendTransaction(transactionRequest);
 
+              timerTaskGateWay.cancel();
               executeTimeOutGateWay();
             } catch (IOException ioe) {
               this.log.info(
@@ -245,9 +246,12 @@ public class Balancer implements ILedgerSubscriber, Runnable {
                 );
               ioe.printStackTrace();
             }
-          } else if (transaction.getType().equals(TransactionType.LB_ENTRY_REPLY) &&
+          } else if (
+            transaction.getType().equals(TransactionType.LB_ENTRY_REPLY) &&
             !((TargetedTransaction) transaction).getTarget()
-              .equals(this.buildSource())) {
+              .equals(this.buildSource())
+          ) {
+            timerTaskGateWay.cancel();
             executeTimeOutGateWay();
           }
 
@@ -274,9 +278,12 @@ public class Balancer implements ILedgerSubscriber, Runnable {
 
             // Colocar para a última transação ser nula.
             this.lastTransaction = null;
-          } else if (transaction.getType().equals(TransactionType.LB_REQUEST) &&
+          } else if (
+            transaction.getType().equals(TransactionType.LB_REQUEST) &&
             !((TargetedTransaction) transaction).getTarget()
-              .equals(this.buildSource())) {
+              .equals(this.buildSource())
+          ) {
+            timerTaskGateWay.cancel();
             executeTimeOutGateWay();
           }
 
@@ -314,9 +321,12 @@ public class Balancer implements ILedgerSubscriber, Runnable {
                 );
               me.printStackTrace();
             }
-          } else if (transaction.getType().equals(TransactionType.LB_REPLY) &&
+          } else if (
+            transaction.getType().equals(TransactionType.LB_REPLY) &&
             !((TargetedTransaction) transaction).getTarget()
-              .equals(this.buildSource())) {
+              .equals(this.buildSource())
+          ) {
+            timerTaskGateWay.cancel();
             executeTimeOutGateWay();
           }
 
@@ -342,7 +352,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
           if ((timerPass * 1000) >= TIMEOUT_LB_REPLY) {
             lastTransaction = null;
             timerTaskGateWay.cancel();
-            log.info("TIME'S UP");
+            log.info("TIME'S UP executeTimeOutGateWay");
           }
         }
       };
@@ -365,7 +375,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
           if ((timerPass * 1000) >= TIMEOUT_LB_REPLY) {
             lastTransaction = null;
             timerTaskLb.cancel();
-            log.info("TIME'S UP");
+            log.info("TIME'S UP executeTimeOutLB");
           }
         }
       };

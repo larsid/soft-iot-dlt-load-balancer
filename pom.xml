@@ -65,13 +65,17 @@
                 <enabled>true</enabled>
             </snapshots>
         </repository>
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
     </repositories>
     
     <dependencies>
         <dependency>
-            <groupId>io.github.larsid</groupId>
-            <artifactId>SOFT-IoT-DLT-Client-Tangle</artifactId>
-            <version>1.0-SNAPSHOT</version>
+            <groupId>com.github.larsid</groupId>
+            <artifactId>soft-iot-dlt-client-tangle-hornet</artifactId>
+            <version>96dba1fb12</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -92,7 +96,7 @@
             <version>1.0-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
-         <dependency>
+        <dependency>
             <groupId>io.github.larsid</groupId>
             <artifactId>SOFT-IoT-DLT-Auth</artifactId>
             <version>1.0-SNAPSHOT</version>
@@ -104,7 +108,7 @@
             <version>20230618</version>
             <scope>compile</scope>
         </dependency>
-         <dependency>
+        <dependency>
             <groupId>org.eclipse.paho</groupId>
             <artifactId>org.eclipse.paho.client.mqttv3</artifactId>
             <version>1.2.5</version>
@@ -123,7 +127,7 @@
                         <Bundle-SymbolicName>${project.artifactId}</Bundle-SymbolicName>
                         <Bundle-Version>${project.version}</Bundle-Version>
                         <Embed-Dependency>
-                       		gson,
+                            gson,
                             json,
                             org.eclipse.paho.client.mqttv3
                             ,
@@ -160,21 +164,21 @@
                     <autoReleaseAfterClose>true</autoReleaseAfterClose>
                 </configuration>
             </plugin>
-             <plugin>
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-gpg-plugin</artifactId>
                 <version>1.5</version>
                 <executions>
                     <execution>
-                    <id>sign-artifacts</id>
-                    <phase>verify</phase>
-                    <goals>
-                        <goal>sign</goal>
-                    </goals>
-                    <configuration>
-                        <skip>true</skip>
-                        <keyname>${env.GPG_KEYNAME}</keyname>
-                    </configuration>
+                        <id>sign-artifacts</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>sign</goal>
+                        </goals>
+                        <configuration>
+                            <skip>true</skip>
+                            <keyname>${env.GPG_KEYNAME}</keyname>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>       

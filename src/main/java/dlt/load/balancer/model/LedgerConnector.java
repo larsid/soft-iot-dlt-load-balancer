@@ -1,9 +1,10 @@
 package dlt.load.balancer.model;
 
-import dlt.client.tangle.model.transactions.Transaction;
-import dlt.client.tangle.services.ILedgerReader;
-import dlt.client.tangle.services.ILedgerSubscriber;
-import dlt.client.tangle.services.ILedgerWriter;
+import dlt.client.tangle.hornet.model.transactions.IndexTransaction;
+import dlt.client.tangle.hornet.model.transactions.Transaction;
+import dlt.client.tangle.hornet.services.ILedgerReader;
+import dlt.client.tangle.hornet.services.ILedgerSubscriber;
+import dlt.client.tangle.hornet.services.ILedgerWriter;
 
 /**
  *
@@ -32,11 +33,8 @@ public class LedgerConnector {
     }
 
     public void put(Transaction transaction) throws InterruptedException {
-        this.ledgerWriter.put(transaction);
-    }
-
-    public Transaction getTransactionByHash(String hash) {
-        return this.ledgerWriter.getTransactionByHash(hash);
+        IndexTransaction indexedTransaction = new IndexTransaction(transaction.getType().name(), transaction);
+        this.ledgerWriter.put(indexedTransaction);
     }
 
     public ILedgerWriter getLedgerWriter() {

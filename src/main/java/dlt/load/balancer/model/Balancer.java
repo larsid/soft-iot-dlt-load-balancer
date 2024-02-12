@@ -301,7 +301,9 @@ public class Balancer implements ILedgerSubscriber, Runnable {
           timerTaskGateWay.cancel();
           
           try {
-            this.removeFirstDevice(transaction.getSource().split("/")[2]);
+            String ip = transaction.getSource().split("/")[2]; //Só funcionará se o group tiver um '/' EX: cloud/c1 - Alterar
+            String port = transaction.getSource().split("/")[3]; //Idem para acima
+            this.removeFirstDevice(ip, port);
             
             Transaction transactionDevice = new LBDevice(
               source,
@@ -385,7 +387,9 @@ public class Balancer implements ILedgerSubscriber, Runnable {
             timerTaskGateWay.cancel();
 
             try {
-              this.removeFirstDevice(transaction.getSource().split("/")[2]);
+              String ip = transaction.getSource().split("/")[2];
+              String port = transaction.getSource().split("/")[3];
+              this.removeFirstDevice(ip, port);
               this.lastTransaction = null;
             } catch (MqttException me) {
               logger.info("Load Balancer - Error! Unable to remove the first device.");
@@ -436,14 +440,16 @@ public class Balancer implements ILedgerSubscriber, Runnable {
           timerPass = timerPass + 1;
           log.info(String.valueOf(timerPass));
 
-          if ((timerPass * 1000) < TIMEOUT_LB_REPLY) {
+          if ((timerPass * 1000) >= TIMEOUT_LB_REPLY) {
+            log.info("TIME'S UP executeTimeOutLB");
             if(multiLayerBalancing){
+                log.info("Send multi-layer balancing request.");
                 Transaction trans = new LBMultiRequest(buildSource(), groupManager.getGroup());
                 sendTransaction(trans);
+            }else{
+                lastTransaction = null;
             }
-            lastTransaction = null;
             timerTaskLb.cancel();
-            log.info("TIME'S UP executeTimeOutLB");
           }
         }
     };
@@ -486,10 +492,12 @@ public class Balancer implements ILedgerSubscriber, Runnable {
     return new StringBuilder(this.groupManager.getGroup())
       .append("/")
       .append(this.idManager.getIP())
+      .append("/")
+      .append(this.currentMqttPort())
       .toString();
   }
 
-  public void removeFirstDevice(String targetIp) throws MqttException {
+  public void removeFirstDevice(String targetIp, String targetMqttPort) throws MqttException {
     try {
       List<Device> allDevices = deviceManager.getAllDevices();
 
@@ -498,7 +506,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
         JsonObject jsonPublish = new JsonObject();
         jsonPublish.addProperty("id", deviceARemover.getId());
         jsonPublish.addProperty("url", "tcp://" + targetIp);
-        jsonPublish.addProperty("port", deviceARemover.getId());
+        jsonPublish.addProperty("port", targetMqttPort);
         jsonPublish.addProperty("user", "karaf");
         jsonPublish.addProperty("password", "karaf");
 
@@ -610,4 +618,10 @@ public class Balancer implements ILedgerSubscriber, Runnable {
         }
         return isMultiLayer != null && isMultiLayer.equals("1");
     }
+    
+    private String currentMqttPort(){
+        String port = System.getenv("GATEWAY_PORT");
+        return port == null ? "1883" : port;
+    }
+    
 }

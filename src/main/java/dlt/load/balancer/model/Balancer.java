@@ -28,6 +28,7 @@ import dlt.id.manager.services.IIDManagerService;
 import java.io.IOException;
 
 import java.net.InetAddress;
+import java.net.URL;
 import java.net.UnknownHostException;
 import java.util.List;
 import java.util.Timer;
@@ -67,6 +68,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
   private boolean flagSubscribe;
   private static final Logger logger = Logger.getLogger(Balancer.class.getName());
   private boolean balanceable, multiLayerBalancing;
+  private String realMqttPort;
 
   ExecutorService executorTimeout = Executors.newSingleThreadExecutor();
 
@@ -148,7 +150,9 @@ public class Balancer implements ILedgerSubscriber, Runnable {
         .stream()
         .filter(String.class::isInstance)
         .map(String.class::cast)
-        .collect(toList());
+        .peek(s -> {
+            logger.log(Level.INFO, "Load balancer - Subscribe at {0}", s);
+        }).collect(toList());
   }
 
   public void start() {
@@ -157,6 +161,8 @@ public class Balancer implements ILedgerSubscriber, Runnable {
     logger.log(Level.INFO, "IS BALANCEABLE: {0}", this.balanceable);
     this.multiLayerBalancing = this.isMultiLayerBalancing();
     logger.log(Level.INFO, "IS MULTI LAYER BALANCING: {0}", this.multiLayerBalancing);
+    this.realMqttPort = this.currentMqttPort();
+    logger.log(Level.INFO, "Real MQTT PORT: {0}", this.realMqttPort);
   }
 
   public void stop() {
@@ -547,6 +553,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
   public void update(Object trans, Object messageId) {
       
     if(!this.balanceable){
+        logger.log(Level.INFO, "Load balancer - New message but will not processed because is not balanceable.");
         return;
     }
     
@@ -579,11 +586,11 @@ public class Balancer implements ILedgerSubscriber, Runnable {
   @Override
   public void run() {
     try {
-      InetAddress inet = InetAddress.getByName(
-        this.connector.getLedgerWriter().getUrl()
-      );
-
-      if (inet.isReachable(3000)) {
+        URL urlObj = new URL(this.connector.getLedgerWriter().getUrl());
+        String host = urlObj.getHost(); 
+        InetAddress inet = InetAddress.getByName(host);
+    
+      if (inet.isReachable(5000)) {
         if (this.flagSubscribe) {
           this.subscribedTopics.forEach(topic ->
               this.connector.subscribe(topic, this)

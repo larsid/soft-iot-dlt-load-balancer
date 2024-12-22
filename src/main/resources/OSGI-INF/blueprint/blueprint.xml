@@ -12,7 +12,7 @@
         <cm:default-properties>
             <cm:property name="TIMEOUT_LB_REPLY" value="20000" />
             <cm:property name="TIMEOUT_GATEWAY" value="40000" />
-            <cm:property name="TOPICS" value="[sn, tx]" />
+            <cm:property name="TOPICS" value="[LB_*]" />
             <cm:property name="IS_BALANCEABLE" value="true" />
         </cm:default-properties>
     </cm:property-placeholder>

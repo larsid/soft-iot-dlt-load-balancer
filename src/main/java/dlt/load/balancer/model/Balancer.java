@@ -31,6 +31,7 @@ import java.net.InetAddress;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.util.List;
+import java.util.Optional;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ExecutorService;
@@ -41,6 +42,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.json.JSONArray;
+import org.json.JSONException;
 
 /**
  *
@@ -142,17 +144,20 @@ public class Balancer implements ILedgerSubscriber, Runnable {
   }
 
   public void setSubscribedTopics(String topicsJSON) {
-    logger.log(Level.INFO, "Set topics: {0}", topicsJSON);
+    topicsJSON = Optional
+            .ofNullable(System.getenv("TOPICS"))
+            .orElse(topicsJSON);
+    try {
+        JSONArray array = new JSONArray(topicsJSON);
+        this.subscribedTopics = array.toList().stream()
+            .filter(String.class::isInstance)
+            .map(String.class::cast)
+            .collect(toList());
+    } catch (JSONException e) {
+        logger.log(Level.SEVERE, "Formato inválido para TOPICS: " + topicsJSON, e);
+        this.subscribedTopics = List.of("LB_*");
+    }
 
-    this.subscribedTopics =
-      new JSONArray(topicsJSON)
-        .toList()
-        .stream()
-        .filter(String.class::isInstance)
-        .map(String.class::cast)
-        .peek(s -> {
-            logger.log(Level.INFO, "Load balancer - Subscribe at {0}", s);
-        }).collect(toList());
   }
 
   public void start() {

@@ -591,29 +591,42 @@ public class Balancer implements ILedgerSubscriber, Runnable {
   @Override
   public void run() {
     try {
-        URL urlObj = new URL(this.connector.getLedgerWriter().getUrl());
-        String host = urlObj.getHost(); 
-        InetAddress inet = InetAddress.getByName(host);
-    
-      if (inet.isReachable(5000)) {
-        if (this.flagSubscribe) {
-          this.subscribedTopics.forEach(topic ->
-              this.connector.subscribe(topic, this)
-            );
+           String ledgerUrl = this.connector.getLedgerWriter().getUrl();
+           logger.log(Level.INFO, "Verificando conectividade com: {0}", ledgerUrl);
 
-          this.flagSubscribe = false;
-        }
-      } else {
-        this.flagSubscribe = true;
-      }
-    } catch (UnknownHostException uhe) {
-      logger.info("Error! Unknown Host.");
-      uhe.printStackTrace();
-    } catch (IOException ioe) {
-      logger.info("Error! Can't connect to InetAddress.");
-      ioe.printStackTrace();
-    }
-  }
+           URL urlObj = new URL(ledgerUrl);
+           String host = urlObj.getHost(); 
+           InetAddress inet = InetAddress.getByName(host);
+
+           if (inet.isReachable(5000)) {
+               logger.log(Level.INFO, "Conectado com sucesso a: {0}", host);
+
+               if (this.flagSubscribe) {
+                   logger.info("flagSubscribe = true. Iniciando processo de inscrição nos tópicos...");
+
+                   this.subscribedTopics.forEach(topic -> {
+                       logger.log(Level.INFO, "Inscrevendo-se no tópico: {0}", topic);
+                       this.connector.subscribe(topic, this);
+                   });
+
+                   this.flagSubscribe = false;
+                   logger.info("Inscrição concluída. flagSubscribe setado para false.");
+               } else {
+                   logger.fine("Já inscrito. Nenhuma ação necessária.");
+               }
+           } else {
+               logger.log(Level.WARNING, "Host inacessível: {0}. flagSubscribe setado para true.", host);
+               this.flagSubscribe = true;
+           }
+
+       } catch (UnknownHostException uhe) {
+           logger.severe("Erro: Host desconhecido.");
+           uhe.printStackTrace();
+       } catch (IOException ioe) {
+           logger.severe("Erro: Falha ao conectar com o endereço.");
+           ioe.printStackTrace();
+       }
+   }
 
    private boolean isBalanceable() {
         String isBalanceableValue = System.getenv("IS_BALANCEABLE");

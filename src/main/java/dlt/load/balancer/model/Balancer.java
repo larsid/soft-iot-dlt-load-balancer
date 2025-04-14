@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.URL;
 import java.net.UnknownHostException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Timer;
@@ -603,8 +604,9 @@ public class Balancer implements ILedgerSubscriber, Runnable {
                logger.log(Level.INFO, "Conectado com sucesso a: {0}", host);
 
                if (this.flagSubscribe) {
-                   logger.info("flagSubscribe = true. Iniciando processo de inscrição nos tópicos...");
-
+                   String topics = Arrays.toString(this.subscribedTopics.toArray());
+                   logger.log(Level.INFO, "Iniciando processo de inscrição nos tópicos: {0}", topics);
+                  
                    this.subscribedTopics.forEach(topic -> {
                        logger.log(Level.INFO, "Inscrevendo-se no tópico: {0}", topic);
                        this.connector.subscribe(topic, this);
@@ -621,11 +623,9 @@ public class Balancer implements ILedgerSubscriber, Runnable {
            }
 
        } catch (UnknownHostException uhe) {
-           logger.severe("Erro: Host desconhecido.");
-           uhe.printStackTrace();
+           logger.log(Level.SEVERE, "Erro: Host desconhecido.", uhe);
        } catch (IOException ioe) {
-           logger.severe("Erro: Falha ao conectar com o endereço.");
-           ioe.printStackTrace();
+           logger.log(Level.SEVERE, "Erro: Falha ao conectar com o endereço.", ioe);
        }
    }
 

@@ -12,7 +12,6 @@
         <cm:default-properties>
             <cm:property name="TIMEOUT_LB_REPLY" value="20000" />
             <cm:property name="TIMEOUT_GATEWAY" value="40000" />
-            <cm:property name="TOPICS" value="[LB_*]" />
             <cm:property name="IS_BALANCEABLE" value="true" />
         </cm:default-properties>
     </cm:property-placeholder>
@@ -40,9 +39,7 @@
         <property name="idManager" ref="idManagerService"/>
         <property name="deviceManager" ref="deviceManagerService"/>
         <property name="publisher" ref="publisherService"/>
-        
-       
+               
         <property name="groupManager" ref="DLTGroupManagerService"/> 
-        <property name="subscribedTopics" value="${TOPICS}"/>
     </bean>   
 </blueprint>

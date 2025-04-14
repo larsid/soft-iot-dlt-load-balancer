@@ -152,12 +152,12 @@ public class Balancer implements ILedgerSubscriber, Runnable {
         this.subscribedTopics = array.toList().stream()
             .filter(String.class::isInstance)
             .map(String.class::cast)
+            .peek(topic -> logger.log(Level.INFO, "Topic read: {0}", topic))
             .collect(toList());
     } catch (JSONException e) {
         logger.log(Level.SEVERE, "Formato inválido para TOPICS: " + topicsJSON, e);
         this.subscribedTopics = List.of("LB_*");
     }
-
   }
 
   public void start() {
@@ -168,6 +168,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
     logger.log(Level.INFO, "IS MULTI LAYER BALANCING: {0}", this.multiLayerBalancing);
     this.realMqttPort = this.currentMqttPort();
     logger.log(Level.INFO, "Real MQTT PORT: {0}", this.realMqttPort);
+    this.setSubscribedTopics("");
   }
 
   public void stop() {

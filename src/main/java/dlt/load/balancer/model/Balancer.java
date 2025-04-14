@@ -161,6 +161,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
   }
 
   public void start() {
+    this.setSubscribedTopics("");
     this.executor.scheduleAtFixedRate(this, 0, 5, TimeUnit.SECONDS);
     this.balanceable = this.isBalanceable();
     logger.log(Level.INFO, "IS BALANCEABLE: {0}", this.balanceable);
@@ -168,7 +169,6 @@ public class Balancer implements ILedgerSubscriber, Runnable {
     logger.log(Level.INFO, "IS MULTI LAYER BALANCING: {0}", this.multiLayerBalancing);
     this.realMqttPort = this.currentMqttPort();
     logger.log(Level.INFO, "Real MQTT PORT: {0}", this.realMqttPort);
-    this.setSubscribedTopics("");
   }
 
   public void stop() {

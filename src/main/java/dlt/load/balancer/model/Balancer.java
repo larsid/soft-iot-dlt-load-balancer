@@ -193,234 +193,263 @@ public class Balancer implements ILedgerSubscriber, Runnable {
     }
   }
 
-  private void messageArrived(Transaction transaction) {
-    logger.info("Waiting for LB_ENTRY OR LB_MULTI_REQUEST");
-    logger.info("Load - Last transaction is Null");
-    String source = this.buildSource();
+    private void messageArrived(Transaction transaction) {
+      logger.info("Esperando LB_ENTRY ou LB_MULTI_REQUEST...");
 
-    if (
-      transaction.is(TransactionType.LB_STATUS) &&
-      transaction.isLoopback(source)
-    ) {
-        this.lastStatus = (Status) transaction;
-        return;
-    }
-    
-    if (!transaction.is(TransactionType.LB_ENTRY) 
-            || !transaction.is(TransactionType.LB_MULTI_DEVICE_REQUEST)) {
-        return;
-    }
-    
-    if (transaction.isLoopback(source)) {
-        // Definindo minha última transação enviada.
-        this.lastTransaction = transaction;
-        executeTimeOutLB();
-        return;
-    } 
-    TransactionType type = transaction.getType();
-    logger.log(Level.INFO, "Receive message type: {0}", type);
+      String source = this.buildSource();
+      logger.log(Level.INFO, "Source gerado: {0}", source);
 
-    if (!this.lastStatus.getAvailable()) {
-        logger.info("Is not avaliable to receive new device.");
-        return;
-    }
-    
-    String group = this.groupManager.getGroup();
-    String newTarget = transaction.getSource();
+      if (transaction.is(TransactionType.LB_STATUS) && transaction.isLoopback(source)) {
+          logger.info("Transação LB_STATUS de loopback recebida. Atualizando lastStatus.");
+          this.lastStatus = (Status) transaction;
+          return;
+      }
 
-    Transaction transactionReply = type.isMultiLayer() 
-            ? new LBMultiResponse(source, group, newTarget)
-            : new LBReply(source, group, newTarget);
-    
-    this.sendTransaction(transactionReply);
+      if (!transaction.is(TransactionType.LB_ENTRY) && 
+          !transaction.is(TransactionType.LB_MULTI_DEVICE_REQUEST)) {
+          logger.log(Level.INFO, "Transação ignorada. Tipo não é LB_ENTRY nem LB_MULTI_DEVICE_REQUEST.");
+          return;
+      }
 
+      if (transaction.isLoopback(source)) {
+          logger.info("Transação de loopback detectada. Salvando como lastTransaction e executando timeout.");
+          this.lastTransaction = transaction;
+          executeTimeOutLB();
+          return;
+      }
+
+      TransactionType type = transaction.getType();
+      
+      if (!this.lastStatus.getAvailable()) {
+          logger.info("Gateway indisponível para receber novos devices.");
+          return;
+      }
+
+      String group = this.groupManager.getGroup();
+      
+      String newTarget = transaction.getSource();
+
+      Transaction transactionReply = type.isMultiLayer() 
+          ? new LBMultiResponse(source, group, newTarget)
+          : new LBReply(source, group, newTarget);
+
+      this.sendTransaction(transactionReply);
   }
 
-  private void processTransactions(Transaction transaction) {
-    String source = this.buildSource();
-    
-    logger.info("Processing transaction...");
-    
-    // Somente se as transações recebidas não forem enviadas pelo próprio gateway.
-    if (transaction.isLoopback(source)) {
-        return;
-    }
-    String group = this.groupManager.getGroup();
-    String newTarget = transaction.getSource();
-    
-    switch (lastTransaction.getType()) {
-      case LB_ENTRY:
-        if(!transaction.is(TransactionType.LB_ENTRY_REPLY)){
-            return;
-        }
-        
-        if(((TargetedTransaction) transaction).isSameTarget(source)) {
-          timerTaskLb.cancel();
-          timerTaskGateWay.cancel();
-          
-          // Enviar LB_REQUEST.
-          try {
-            Device deviceToSend = this.deviceManager.getAllDevices().get(0);
-            String deviceStringToSend = DeviceWrapper.toJSON(deviceToSend);
-            this.lastRemovedDevice = deviceStringToSend;
 
-            Transaction transactionRequest = new Request(
-              source,
-              group,
-              deviceStringToSend,
-              newTarget
-            );
-            this.sendTransaction(transactionRequest);
+    private void processTransactions(Transaction transaction) {
+      String source = this.buildSource();
+      logger.info("Iniciando processamento da transação...");
 
-            timerTaskGateWay.cancel();
-            executeTimeOutGateWay();
-          } catch (IOException ioe) {
-            logger.info("Load Balancer - Error! Unable to retrieve device list.");
-            ioe.printStackTrace();
-          }
-        } else {
-          timerTaskGateWay.cancel();
-          executeTimeOutGateWay();
-        }
+      if (transaction.isLoopback(source)) {
+          logger.info("Transação de loopback ignorada.");
+          return;
+      }
 
-        break;
-      case LB_ENTRY_REPLY:
-        if(!transaction.is(TransactionType.LB_REQUEST)){
-            return;
-        }
-        if (((TargetedTransaction) transaction).isSameTarget(source)) {
-          timerTaskGateWay.cancel();
-          // Carregar dispositivo na lista.
-          String device = ((Request) transaction).getDevice();
-          this.loadSwapReceberDispositivo(device);
+      String group = this.groupManager.getGroup();
+      String newTarget = transaction.getSource();
+      TransactionType lastType = lastTransaction.getType();
+      logger.log(Level.INFO, "Última transação registrada: {0}", lastType);
+      
+      switch (lastType) {
+          case LB_ENTRY:
+              if (!transaction.is(TransactionType.LB_ENTRY_REPLY)) {
+                  logger.info("Transação ignorada. Esperado LB_ENTRY_REPLY.");
+                  return;
+              }
 
-          // Enviar LB_REPLY.
-          Transaction transactionReply = new Reply(source, group, newTarget);
-          this.sendTransaction(transactionReply);
+              if (((TargetedTransaction) transaction).isSameTarget(source)) {
+                  logger.info("LB_ENTRY_REPLY recebido com target correto. Iniciando envio de LB_REQUEST.");
 
-          // Colocar para a última transação ser nula.
-          this.lastTransaction = null;
-        } else {
-          timerTaskGateWay.cancel();
-          executeTimeOutGateWay();
-        }
+                  timerTaskLb.cancel();
+                  timerTaskGateWay.cancel();
 
-        break;
-      case LB_REQUEST:
-        if(!transaction.is(TransactionType.LB_REPLY)){
-            return;
-        }
-        if (((TargetedTransaction) transaction).isSameTarget(source)) {
-          timerTaskGateWay.cancel();
-          
-          try {
-            String ip = transaction.getSource().split("/")[2]; //Só funcionará se o group tiver um '/' EX: cloud/c1 - Alterar
-            String port = transaction.getSource().split("/")[3]; //Idem para acima
-            this.removeFirstDevice(ip, port);
-            
-            Transaction transactionDevice = new LBDevice(
-              source,
-              group,
-              this.lastRemovedDevice,
-              newTarget
-            );
+                  try {
+                      Device deviceToSend = this.deviceManager.getAllDevices().get(0);
+                      String deviceStringToSend = DeviceWrapper.toJSON(deviceToSend);
+                      this.lastRemovedDevice = deviceStringToSend;
 
-            this.sendTransaction(transactionDevice);
+                      logger.log(Level.INFO, "Device selecionado para envio: {0}", deviceStringToSend);
 
-            // Colocar para a última transação ser nula.
-            this.lastTransaction = null;
-          } catch (MqttException me) {
-            logger.info("Load Balancer - Error! Unable to remove the first device.");
-            me.printStackTrace();
-          }
-        } else {
-          timerTaskGateWay.cancel();
-          executeTimeOutGateWay();
-        }
+                      Transaction transactionRequest = new Request(source, group, deviceStringToSend, newTarget);
+                      this.sendTransaction(transactionRequest);
 
-        break;
-      case LB_MULTI_REQUEST:
-          if(!transaction.is(TransactionType.LB_MULTI_RESPONSE)){
-              return;
-          }
-          
-          if(((TargetedTransaction) transaction).isSameTarget(source)) {
-            timerTaskLb.cancel();
-            timerTaskGateWay.cancel();
+                      logger.info("LB_REQUEST enviado com sucesso.");
+                      timerTaskGateWay.cancel();
+                      executeTimeOutGateWay();
+                  } catch (IOException ioe) {
+                      logger.info("Erro ao obter lista de devices.");
+                      ioe.printStackTrace();
+                  }
+              } else {
+                  logger.info("LB_ENTRY_REPLY com target diferente. Timeout reiniciado.");
+                  timerTaskGateWay.cancel();
+                  executeTimeOutGateWay();
+              }
+              break;
 
-            try {
-                Device deviceToSend = this.deviceManager.getAllDevices().get(0);
-                String deviceStringToSend = DeviceWrapper.toJSON(deviceToSend);
-                this.lastRemovedDevice = deviceStringToSend;
+          case LB_ENTRY_REPLY:
+              if (!transaction.is(TransactionType.LB_REQUEST)) {
+                  logger.info("Transação ignorada. Esperado LB_REQUEST.");
+                  return;
+              }
 
-                Transaction transactionRequest = new LBMultiDevice(
-                  source,
-                  group,
-                  deviceStringToSend,
-                  newTarget
-                );
-                this.sendTransaction(transactionRequest);
+              if (((TargetedTransaction) transaction).isSameTarget(source)) {
+                  logger.info("LB_REQUEST recebido corretamente. Adicionando device local.");
 
-                timerTaskGateWay.cancel();
-                executeTimeOutGateWay();
-            } catch (IOException ioe) {
-              logger.info("Load Balancer - Error! Unable to retrieve device list.");
-              ioe.printStackTrace();
-            }
-        } 
-          else {
-          timerTaskGateWay.cancel();
-          executeTimeOutGateWay();
-        }
-        break;
-      case LB_MULTI_RESPONSE:
-        if(!transaction.is(TransactionType.LB_MULTI_DEVICE_REQUEST)){
-            return;
-        }
-        if (((TargetedTransaction) transaction).isSameTarget(source)) {
-          timerTaskGateWay.cancel();
+                  timerTaskGateWay.cancel();
 
-          String device = ((LBMultiDevice) transaction).getDevice();
-          this.loadSwapReceberDispositivo(device);
+                  String device = ((Request) transaction).getDevice();
+                  this.loadSwapReceberDispositivo(device);
 
-          Transaction response = new LBMultiDeviceResponse(source, group, device, newTarget);
-          this.sendTransaction(response);
+                  Transaction transactionReply = new Reply(source, group, newTarget);
+                  this.sendTransaction(transactionReply);
 
-          this.lastTransaction = null;
-        } else {
-          timerTaskGateWay.cancel();
-          executeTimeOutGateWay();
-        }
-        break;
-      case LB_MULTI_DEVICE_REQUEST:
-          if(!transaction.is(TransactionType.LB_MULTI_DEVICE_RESPONSE)){
-              return;
-          }
-          if (((TargetedTransaction) transaction).isSameTarget(source)) {
-            timerTaskGateWay.cancel();
+                  logger.info("LB_REPLY enviado. Resetando lastTransaction.");
+                  this.lastTransaction = null;
+              } else {
+                  logger.info("LB_REQUEST com target errado. Timeout reiniciado.");
+                  timerTaskGateWay.cancel();
+                  executeTimeOutGateWay();
+              }
+              break;
 
-            try {
-              String ip = transaction.getSource().split("/")[2];
-              String port = transaction.getSource().split("/")[3];
-              this.removeFirstDevice(ip, port);
-              this.lastTransaction = null;
-            } catch (MqttException me) {
-              logger.info("Load Balancer - Error! Unable to remove the first device.");
-              me.printStackTrace();
-            }
-        } else {
-          timerTaskGateWay.cancel();
-          executeTimeOutGateWay();
-        }
-        break;
-      case LB_MULTI_DEVICE_RESPONSE:
-        logger.info(TransactionType.LB_MULTI_DEVICE_RESPONSE.name());
-        break;
-      default:
-        logger.info("Error! Something went wrong.");
-        break;
-    }
+          case LB_REQUEST:
+              if (!transaction.is(TransactionType.LB_REPLY)) {
+                  logger.info("Transação ignorada. Esperado LB_REPLY.");
+                  return;
+              }
+
+              if (((TargetedTransaction) transaction).isSameTarget(source)) {
+                  logger.info("LB_REPLY recebido. Removendo device do gateway local.");
+
+                  timerTaskGateWay.cancel();
+
+                  try {
+                      String ip = transaction.getSource().split("/")[2];
+                      String port = transaction.getSource().split("/")[3];
+
+                      logger.log(Level.INFO, "IP destino: {0}, Porta destino: {1}", new Object[]{ip, port});
+                      this.removeFirstDevice(ip, port);
+
+                      Transaction transactionDevice = new LBDevice(source, group, this.lastRemovedDevice, newTarget);
+                      this.sendTransaction(transactionDevice);
+
+                      logger.info("LB_DEVICE enviado. Resetando lastTransaction.");
+                      this.lastTransaction = null;
+                  } catch (MqttException me) {
+                      logger.info("Erro ao remover device.");
+                      me.printStackTrace();
+                  }
+              } else {
+                  logger.info("LB_REPLY com target errado. Timeout reiniciado.");
+                  timerTaskGateWay.cancel();
+                  executeTimeOutGateWay();
+              }
+              break;
+
+          case LB_MULTI_REQUEST:
+              if (!transaction.is(TransactionType.LB_MULTI_RESPONSE)) {
+                  logger.info("Transação ignorada. Esperado LB_MULTI_RESPONSE.");
+                  return;
+              }
+
+              if (((TargetedTransaction) transaction).isSameTarget(source)) {
+                  logger.info("LB_MULTI_RESPONSE recebido corretamente. Preparando envio de LB_MULTI_DEVICE.");
+
+                  timerTaskLb.cancel();
+                  timerTaskGateWay.cancel();
+
+                  try {
+                      Device deviceToSend = this.deviceManager.getAllDevices().get(0);
+                      String deviceStringToSend = DeviceWrapper.toJSON(deviceToSend);
+                      this.lastRemovedDevice = deviceStringToSend;
+
+                      logger.log(Level.INFO, "Device selecionado: {0}", deviceStringToSend);
+
+                      Transaction transactionRequest = new LBMultiDevice(source, group, deviceStringToSend, newTarget);
+                      this.sendTransaction(transactionRequest);
+
+                      logger.info("LB_MULTI_DEVICE enviado com sucesso.");
+                      timerTaskGateWay.cancel();
+                      executeTimeOutGateWay();
+                  } catch (IOException ioe) {
+                      logger.info("Erro ao acessar device list.");
+                      ioe.printStackTrace();
+                  }
+              } else {
+                  logger.info("LB_MULTI_RESPONSE com target errado. Timeout reiniciado.");
+                  timerTaskGateWay.cancel();
+                  executeTimeOutGateWay();
+              }
+              break;
+
+          case LB_MULTI_RESPONSE:
+              if (!transaction.is(TransactionType.LB_MULTI_DEVICE_REQUEST)) {
+                  logger.info("Transação ignorada. Esperado LB_MULTI_DEVICE_REQUEST.");
+                  return;
+              }
+
+              if (((TargetedTransaction) transaction).isSameTarget(source)) {
+                  logger.info("LB_MULTI_DEVICE_REQUEST recebido corretamente. Adicionando device local.");
+
+                  timerTaskGateWay.cancel();
+
+                  String device = ((LBMultiDevice) transaction).getDevice();
+                  this.loadSwapReceberDispositivo(device);
+
+                  Transaction response = new LBMultiDeviceResponse(source, group, device, newTarget);
+                  this.sendTransaction(response);
+
+                  logger.info("LB_MULTI_DEVICE_RESPONSE enviado. Resetando lastTransaction.");
+                  this.lastTransaction = null;
+              } else {
+                  logger.info("LB_MULTI_DEVICE_REQUEST com target errado. Timeout reiniciado.");
+                  timerTaskGateWay.cancel();
+                  executeTimeOutGateWay();
+              }
+              break;
+
+          case LB_MULTI_DEVICE_REQUEST:
+              if (!transaction.is(TransactionType.LB_MULTI_DEVICE_RESPONSE)) {
+                  logger.info("Transação ignorada. Esperado LB_MULTI_DEVICE_RESPONSE.");
+                  return;
+              }
+
+              if (((TargetedTransaction) transaction).isSameTarget(source)) {
+                  logger.info("LB_MULTI_DEVICE_RESPONSE recebido corretamente. Removendo device do gateway local.");
+
+                  timerTaskGateWay.cancel();
+
+                  try {
+                      String ip = transaction.getSource().split("/")[2];
+                      String port = transaction.getSource().split("/")[3];
+
+                      logger.log(Level.INFO, "IP destino: {0}, Porta destino: {1}", new Object[]{ip, port});
+                      this.removeFirstDevice(ip, port);
+
+                      this.lastTransaction = null;
+                  } catch (MqttException me) {
+                      logger.info("Erro ao remover device.");
+                      me.printStackTrace();
+                  }
+              } else {
+                  logger.info("LB_MULTI_DEVICE_RESPONSE com target errado. Timeout reiniciado.");
+                  timerTaskGateWay.cancel();
+                  executeTimeOutGateWay();
+              }
+              break;
+
+          case LB_MULTI_DEVICE_RESPONSE:
+              logger.info("Transação LB_MULTI_DEVICE_RESPONSE recebida. Nada a fazer.");
+              break;
+
+          default:
+              logger.info("Tipo de transação não reconhecido ou não tratado.");
+              break;
+      }
   }
+
 
   private void executeTimeOutGateWay() {
     timerTaskGateWay = new TimerTask() {
@@ -571,13 +600,14 @@ public class Balancer implements ILedgerSubscriber, Runnable {
     
     Transaction transaction = (Transaction) trans;
     logger.log(Level.INFO, "Load balancer - New message with id {0} is Valid", messageId);
-
-    logger.log(Level.INFO, "Message id: {0}", messageId);
     
     if(transaction.isMultiLayerTransaction() && !this.multiLayerBalancing){
         logger.info("Load balancer - Multilayer message type not allowed.");
         return;
     }
+    
+    logger.log(Level.INFO, "Transação recebida: {0}", transaction);
+
     // Evitar o processamento de mensagens antigas.
     if (System.currentTimeMillis() - transaction.getPublishedAt() < 15000 ) {
       if (lastTransaction != null) {

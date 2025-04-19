@@ -187,6 +187,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
 
     public void start() {
         logger.info(this.configs.toString());
+        this.executor.scheduleAtFixedRate(this, 0, 5, TimeUnit.SECONDS); 
     }
 
     public void stop() {

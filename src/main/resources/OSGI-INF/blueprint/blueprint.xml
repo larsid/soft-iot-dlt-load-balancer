@@ -33,8 +33,6 @@
           class="dlt.load.balancer.model.Balancer"
           init-method="start"
           destroy-method="stop">
-        <argument value="${TIMEOUT_LB_REPLY}"/>
-        <argument value="${TIMEOUT_GATEWAY}"/>
         <property name="connector" ref="ledgerConnector"/>
         <property name="idManager" ref="idManagerService"/>
         <property name="deviceManager" ref="deviceManagerService"/>

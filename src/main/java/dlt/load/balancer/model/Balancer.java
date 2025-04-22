@@ -54,7 +54,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
     private IDLTGroupManager groupManager;
     private IPublisher iPublisher;
 
-    private TimerTask timerTaskLB;
+    private TimerTask timerLoadBalancer;
     private TimerTask timerTaskGateway;
 
     private int timerPass;
@@ -80,7 +80,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
     }
 
     public void buildTimerTaskLB() {
-        timerTaskLB = new TimerTask() {
+        timerLoadBalancer = new TimerTask() {
             @Override
             public void run() {
                 Logger log = Logger.getLogger(Balancer.class.getName());
@@ -90,7 +90,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
 
                 if ((timerPass * 1000) >= configs.getTIMEOUT_LB_REPLY()) {
                     lastThirdPartyTrans = null;
-                    timerTaskLB.cancel();
+                    timerLoadBalancer.cancel();
                     log.info("TIME'S UP buildTimerTaskLB");
                 }
             }
@@ -138,7 +138,11 @@ public class Balancer implements ILedgerSubscriber, Runnable {
     }
 
     private void startLoadBalancerOrderTimeout() {
-        timerTaskLB = new TimerTask() {
+        if (timerLoadBalancer != null) {
+            timerLoadBalancer.cancel();
+        }
+
+        timerLoadBalancer = new TimerTask() {
             @Override
             public void run() {
                 Logger log = Logger.getLogger(Balancer.class.getName());
@@ -155,14 +159,14 @@ public class Balancer implements ILedgerSubscriber, Runnable {
                     } else {
                         lastThirdPartyTrans = null;
                     }
-                    timerTaskLB.cancel();
+                    timerLoadBalancer.cancel();
                 }
             }
         };
 
         timerPass = 0;
         Timer timer = new Timer();
-        timer.scheduleAtFixedRate(timerTaskLB, 1000, 1000);
+        timer.scheduleAtFixedRate(timerLoadBalancer, 1000, 1000);
     }
 
     public void setPublisher(IPublisher iPublisher) {
@@ -187,7 +191,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
 
     public void start() {
         logger.info(this.configs.toString());
-        this.executor.scheduleAtFixedRate(this, 0, 5, TimeUnit.SECONDS); 
+        this.executor.scheduleAtFixedRate(this, 0, 5, TimeUnit.SECONDS);
     }
 
     public void stop() {
@@ -256,7 +260,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
 
         logger.info("LB_ENTRY_REPLY recebido com target correto. Iniciando envio de LB_REQUEST.");
 
-        timerTaskLB.cancel();
+        timerLoadBalancer.cancel();
         timerTaskGateway.cancel();
 
         try {
@@ -353,7 +357,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
 
         logger.info("Preparando envio de LB_MULTI_DEVICE.");
 
-        timerTaskLB.cancel();
+        timerLoadBalancer.cancel();
         timerTaskGateway.cancel();
 
         try {
@@ -498,7 +502,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
             this.connector.put(lastThirdPartyTrans);
             Timer timer = new Timer();
             timerPass = 0;
-            timer.scheduleAtFixedRate(timerTaskLB, 1000, 1000);
+            timer.scheduleAtFixedRate(timerLoadBalancer, 1000, 1000);
         } catch (InterruptedException ie) {
             logger.info("Load Balancer - Error commit transaction.");
             Logger.getLogger(Balancer.class.getName()).log(Level.SEVERE, null, ie);
@@ -582,17 +586,21 @@ public class Balancer implements ILedgerSubscriber, Runnable {
             logger.log(Level.INFO, "\n{0}\n", transaction);
         }
 
-        if (lastThirdPartyTrans == null) {
-            if (isStatusTransaction && transaction.isLoopback(source)) {
-                logger.info("Atualizando status interno.");
-                this.internalStatus = (Status) transaction;
+        if (isStatusTransaction) {
+            if (!isLoopback) {
                 return;
             }
+            logger.info("Atualizando status interno.");
+            this.internalStatus = (Status) transaction;
+            return;
+        }
+
+        if (lastThirdPartyTrans == null) {
             this.processBalancerStartTransactions(transaction, source);
             return;
         }
 
-        if (isLoopback || isStatusTransaction) {
+        if (isLoopback) {
             return;
         }
 

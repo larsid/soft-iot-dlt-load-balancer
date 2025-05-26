@@ -21,7 +21,7 @@ public final class BalancerConfigs {
     private final Long TIMEOUT_LB_REPLY;
     private final Long TIMEOUT_GATEWAY;
 
-    private final Integer maxTryResendTransaction;
+    private final Short maxTryResendTransaction;
 
     private final Long maxPublishMessageInterval;
 
@@ -40,7 +40,7 @@ public final class BalancerConfigs {
         this.maxTryResendTransaction = this.readMaxTryResendTransaction();
     }
 
-    public Long getTIMEOUT_LB_REPLY() {
+    public Long getLBStartReplyTimeout() {
         return TIMEOUT_LB_REPLY;
     }
 
@@ -68,7 +68,7 @@ public final class BalancerConfigs {
         return (System.currentTimeMillis() - publishTime) < maxPublishMessageInterval;
     }
     
-    public Integer getMaxTryResendTransaction(){
+    public Short getMaxTryResendTransaction(){
         return maxTryResendTransaction;
     }
 
@@ -98,7 +98,7 @@ public final class BalancerConfigs {
         }
         return port;
     }
-
+    
     private Long readMaxPublishMessageIntervalEnv() {
         return readEnvLongOrDefault("VALID_MESSAGE_INTERVAL", 15000L);
     }
@@ -111,8 +111,8 @@ public final class BalancerConfigs {
         return readEnvLongOrDefault("TIMEOUT_LB_REPLY", 20000L);
     }
 
-    private Integer readMaxTryResendTransaction() {
-        return this.readEnvLongOrDefault("MAX_TRY_RESEND_TRANS", 3L).intValue();
+    private Short readMaxTryResendTransaction() {
+        return this.readEnvLongOrDefault("MAX_TRY_RESEND_TRANS", 3L).shortValue();
     }
 
     private Long readEnvLongOrDefault(String envName, Long defaultValue) {

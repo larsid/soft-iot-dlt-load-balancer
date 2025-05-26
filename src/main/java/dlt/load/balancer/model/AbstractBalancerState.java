@@ -1,0 +1,91 @@
+package dlt.load.balancer.model;
+
+import dlt.client.tangle.hornet.enums.TransactionType;
+import dlt.client.tangle.hornet.model.transactions.Status;
+import dlt.client.tangle.hornet.model.transactions.Transaction;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+/**
+ *
+ * @author Uellington Damasceno
+ */
+public abstract class AbstractBalancerState implements BalancerState {
+
+    private static final Logger logger = Logger.getLogger(AbstractBalancerState.class.getName());
+
+    protected final Balancer balancer;
+
+    protected String source;
+    protected String group;
+
+    /*
+    VERIFICAR
+    - TIMEOUT
+    -- TEM QUE CANCELAR?
+    -- TEM QUE INICIAR?
+    -- O QUE FAZ QUANDO ESGOTA?
+    --- VOLTA PARA IDLE?
+    --- REPETE?
+    
+    - TRANSACTION
+    -- SEND TRANSACTION?
+     */
+    protected AbstractBalancerState(Balancer balancer) {
+        this.balancer = balancer;
+        this.group = balancer.getGatewayGroup();
+    }
+
+    @Override
+    public abstract void onEnter();
+
+    protected abstract boolean isValidTransaction(Transaction transaction);
+
+    protected abstract void handleInvalidTransaction(Transaction trans);
+
+    protected abstract void handleValidTransaction(Transaction transaction);
+
+    @Override
+    public final void handle(Transaction transaction) {
+        if (!this.balancer.isValidPublishMessageInterval(transaction.getPublishedAt())) {
+            logger.log(Level.WARNING, "{0} foi é considerada antiga.", transaction);
+            return;
+        }
+
+        if (transaction.isMultiLayerTransaction() && !this.balancer.isMultiLayerBalancer()) {
+            logger.info("Load balancer - Multilayer message type not allowed.");
+            return;
+        }
+
+        this.source = balancer.buildSource();
+        boolean isLoopback = transaction.isLoopback(source);
+
+        if (transaction.is(TransactionType.LB_STATUS)) {
+            if (!isLoopback) {
+                return;
+            }
+            logger.info("Atualizando status interno.");
+            this.balancer.updateInternalStatus(transaction);
+            return;
+        }
+
+        if (isLoopback){
+            return;
+        }
+        
+        if (!this.isValidTransaction(transaction)) {
+            this.handleInvalidTransaction(transaction);
+            return;
+        }
+        this.handleValidTransaction(transaction);
+    }
+
+    @Override
+    public void onTimeout() {
+        logger.log(Level.WARNING,
+                "Timeout in state {0}, transitioning to IdleState.",
+                this.getClass().getSimpleName());
+
+        balancer.transitionTo(new IdleState(balancer));
+    }
+}

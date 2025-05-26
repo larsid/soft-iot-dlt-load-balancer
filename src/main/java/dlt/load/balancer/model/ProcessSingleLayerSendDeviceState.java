@@ -1,0 +1,36 @@
+package dlt.load.balancer.model;
+
+import dlt.client.tangle.hornet.enums.TransactionType;
+import dlt.client.tangle.hornet.model.transactions.Request;
+import dlt.client.tangle.hornet.model.transactions.Transaction;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+/**
+ *
+ * @author Uellington Damasceno
+ */
+public class ProcessSingleLayerSendDeviceState extends AbstractProcessSendDeviceState {
+
+    private static final Logger logger = Logger.getLogger(ProcessMultiLayerSendDeviceState.class.getName());
+
+    public ProcessSingleLayerSendDeviceState(Balancer balancer, Transaction transaction) {
+        super(balancer, transaction);
+    }
+
+    @Override
+    protected Transaction buildTransaction(String deviceJson, String sender) {
+        return new Request(source, group, deviceJson, sender);
+    }
+
+    @Override
+    protected boolean isValidTransaction(Transaction transaction) {
+        return transaction.is(TransactionType.LB_ENTRY_REPLY);
+    }
+
+    @Override
+    protected void handleInvalidTransaction(Transaction trans) {
+        logger.log(Level.INFO, "Transação ignorada. Tipo não é LB_ENTRY_REPLY.");
+    }
+
+}

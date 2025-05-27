@@ -1,17 +1,6 @@
 package dlt.load.balancer.model;
 
-import br.uefs.larsid.extended.mapping.devices.services.IDevicePropertiesManager;
-import br.uefs.larsid.extended.mapping.devices.tatu.DeviceWrapper;
-import br.ufba.dcc.wiser.soft_iot.entities.Device;
-import com.google.gson.JsonObject;
-import dlt.auth.services.IPublisher;
-import dlt.client.tangle.hornet.model.transactions.Status;
-import dlt.client.tangle.hornet.model.transactions.Transaction;
-import dlt.client.tangle.hornet.services.ILedgerSubscriber;
-import dlt.id.manager.services.IDLTGroupManager;
-import dlt.id.manager.services.IIDManagerService;
 import java.io.IOException;
-
 import java.net.InetAddress;
 import java.net.URL;
 import java.net.UnknownHostException;
@@ -23,7 +12,20 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
 import org.eclipse.paho.client.mqttv3.MqttException;
+
+import com.google.gson.JsonObject;
+
+import br.uefs.larsid.extended.mapping.devices.services.IDevicePropertiesManager;
+import br.uefs.larsid.extended.mapping.devices.tatu.DeviceWrapper;
+import br.ufba.dcc.wiser.soft_iot.entities.Device;
+import dlt.auth.services.IPublisher;
+import dlt.client.tangle.hornet.model.transactions.Status;
+import dlt.client.tangle.hornet.model.transactions.Transaction;
+import dlt.client.tangle.hornet.services.ILedgerSubscriber;
+import dlt.id.manager.services.IDLTGroupManager;
+import dlt.id.manager.services.IIDManagerService;
 
 /**
  *
@@ -63,7 +65,6 @@ public class Balancer implements ILedgerSubscriber, Runnable {
             return t;
         });
     }
-
 
     public void setPublisher(IPublisher iPublisher) {
         this.iPublisher = iPublisher;
@@ -139,7 +140,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
 
         } catch (IOException ioe) {
             logger.info("Error! To retrieve device list or to remove the first device.");
-            ioe.printStackTrace();
+            logger.log(Level.WARNING, "Exception occurred while sending device.", ioe);
         }
     }
 
@@ -151,12 +152,16 @@ public class Balancer implements ILedgerSubscriber, Runnable {
             deviceManager.addDevice(device);
         } catch (IOException ioe) {
             logger.info("Error! To add a new device to the list.");
-            ioe.printStackTrace();
+            logger.log(Level.WARNING, "Exception occurred while adding a new device.", ioe);
         }
     }
 
-    protected void updateInternalStatus(Transaction transaction) {
-        this.internalStatus = (Status) transaction;
+    public BalancerState getState() {
+        return this.state;
+    }
+
+    protected void updateInternalStatus(Status transaction) {
+        this.internalStatus = transaction;
     }
 
     protected Short qtyMaxTimeResendTransaction() {
@@ -198,6 +203,11 @@ public class Balancer implements ILedgerSubscriber, Runnable {
     }
 
     public void transitionTo(BalancerState newState) {
+        String oldStateName = (this.state != null) ? this.state.getClass().getSimpleName() : "null";
+        String newStateName = newState.getClass().getSimpleName();
+
+        logger.log(Level.INFO, "Transição de estado: {1} -> {2}", new Object[]{oldStateName, newStateName});
+
         this.state = newState;
         this.state.onEnter();
     }

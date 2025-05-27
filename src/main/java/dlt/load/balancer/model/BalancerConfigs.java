@@ -12,7 +12,7 @@ import org.json.JSONException;
  *
  * @author Uellington Damasceno
  */
-public final class BalancerConfigs {
+public class BalancerConfigs {
 
     private final Boolean balanceable;
     private final Boolean multiLayerBalancing;

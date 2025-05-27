@@ -1,12 +1,13 @@
 package dlt.load.balancer.model;
 
-import br.uefs.larsid.extended.mapping.devices.tatu.DeviceWrapper;
-import br.ufba.dcc.wiser.soft_iot.entities.Device;
-import dlt.client.tangle.hornet.model.transactions.Transaction;
 import java.io.IOException;
 import java.util.NoSuchElementException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import br.uefs.larsid.extended.mapping.devices.tatu.DeviceWrapper;
+import br.ufba.dcc.wiser.soft_iot.entities.Device;
+import dlt.client.tangle.hornet.model.transactions.Transaction;
 
 /**
  *
@@ -17,7 +18,7 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
     private static final Logger logger = Logger.getLogger(AbstractProcessSendDeviceState.class.getName());
 
     private Short qtyMaxResendTansaction;
-    private Transaction transBeingProcessed;
+    private final Transaction transBeingProcessed;
     private Device deviceToRemove;
     private BalancerState waitingLBDeviceRecivedReplyState;
 

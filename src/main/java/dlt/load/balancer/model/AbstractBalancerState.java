@@ -18,19 +18,7 @@ public abstract class AbstractBalancerState implements BalancerState {
 
     protected String source;
     protected String group;
-
-    /*
-    VERIFICAR
-    - TIMEOUT
-    -- TEM QUE CANCELAR?
-    -- TEM QUE INICIAR?
-    -- O QUE FAZ QUANDO ESGOTA?
-    --- VOLTA PARA IDLE?
-    --- REPETE?
     
-    - TRANSACTION
-    -- SEND TRANSACTION?
-     */
     protected AbstractBalancerState(Balancer balancer) {
         this.balancer = balancer;
         this.group = balancer.getGatewayGroup();
@@ -65,11 +53,11 @@ public abstract class AbstractBalancerState implements BalancerState {
                 return;
             }
             logger.info("Atualizando status interno.");
-            this.balancer.updateInternalStatus(transaction);
+            this.balancer.updateInternalStatus((Status)transaction);
             return;
         }
 
-        if (isLoopback){
+        if (isLoopback && !transaction.is(TransactionType.LB_ENTRY)){
             return;
         }
         

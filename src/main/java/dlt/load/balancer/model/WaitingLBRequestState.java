@@ -15,7 +15,7 @@ import java.util.logging.Logger;
 public class WaitingLBRequestState extends AbstractBalancerState {
 
     private static final Logger logger = Logger.getLogger(WaitingLBRequestState.class.getName());
-    private boolean isMultiLayerState;
+    private final boolean isMultiLayerState;
     
     public WaitingLBRequestState(Balancer balancer, boolean isMultiLayerState) {
         super(balancer);

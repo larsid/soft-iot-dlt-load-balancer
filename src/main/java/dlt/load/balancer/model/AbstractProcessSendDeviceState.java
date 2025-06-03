@@ -17,7 +17,7 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
 
     private static final Logger logger = Logger.getLogger(AbstractProcessSendDeviceState.class.getName());
 
-    private Short qtyMaxResendTansaction;
+    private Long qtyMaxResendTansaction;
     private final Transaction transBeingProcessed;
     private Device deviceToRemove;
     private BalancerState waitingLBDeviceRecivedReplyState;

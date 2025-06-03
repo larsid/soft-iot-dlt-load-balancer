@@ -166,7 +166,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
             logger.log(Level.WARNING, "Exception occurred while adding a new device.", ioe);
         }
     }
-    
+
     public void updateInternalStatus(Status transaction) {
         this.internalStatus = transaction;
         double currentDeviceCount = transaction.getLastLoad();
@@ -180,7 +180,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
             }
             this.messageSingleLayerSentCounter = 0;
         }
-        
+
         String sourceIdentifier = this.buildSource();
         String targetGroup = this.groupManager.getGroup();
         Long balanceAttemptIntervalMillis = this.configs.getLBEntryResponseTimeout();
@@ -202,8 +202,10 @@ public class Balancer implements ILedgerSubscriber, Runnable {
         }
 
         if (this.messageSingleLayerSentCounter < MAX_ATTEMPTS_SEND_START_BALANCE) {
+            logger.log(Level.INFO, "Solicitação interna de balanceamento de camada unica nº {0} iniciada.", messageSingleLayerSentCounter);
             startBalanceTransactionSignal = new Status(sourceIdentifier, targetGroup, true, currentDeviceCount, transaction.getAvgLoad(), false);
             this.sendTransaction(startBalanceTransactionSignal);
+            this.transitionTo(new WaitingLBReplyState(this));
             this.lastAttemptStartBalanceTime = System.currentTimeMillis();
             this.messageSingleLayerSentCounter++;
             return;
@@ -214,11 +216,15 @@ public class Balancer implements ILedgerSubscriber, Runnable {
         }
 
         if (this.messageMultiLayerSentCounter < MAX_ATTEMPTS_SEND_START_BALANCE) {
+            logger.log(Level.INFO, "Solicitação interna de balanceamento de multi camadas nº {0} iniciada.", messageMultiLayerSentCounter);
+
             startBalanceTransactionSignal = new LBMultiRequest(sourceIdentifier, targetGroup);
             this.sendTransaction(startBalanceTransactionSignal);
+            this.transitionTo(new WaitingLBReplyState(this));
             this.lastAttemptStartBalanceTime = System.currentTimeMillis();
             this.messageMultiLayerSentCounter++;
         }
+
     }
 
     protected Long qtyMaxTimeResendTransaction() {

@@ -68,6 +68,8 @@ public abstract class AbstractBalancerState implements BalancerState {
         }
         
         if (!this.isValidTransaction(transaction)) {
+            logger.log(Level.WARNING, "Recived trans type: {0} from {1}",
+                    new Object[]{transaction.getType(), transaction.getSource()});
             this.handleInvalidTransaction(transaction);
             return;
         }

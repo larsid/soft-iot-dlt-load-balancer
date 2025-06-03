@@ -33,7 +33,7 @@ public class WaitingLBReplyState extends AbstractBalancerState {
 
     @Override
     protected void handleInvalidTransaction(Transaction trans) {
-        logger.log(Level.INFO, "Transação ignorada. Tipo não é LB_ENTRY_REPLY nem LB_MULTI_DEVICE_RESPONSE.");
+        logger.log(Level.INFO, "Acceptable trans: LB_ENTRY_REPLY or LB_MULTI_DEVICE_RESPONSE.");
     }
 
     @Override

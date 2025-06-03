@@ -30,7 +30,7 @@ public class ProcessSingleLayerSendDeviceState extends AbstractProcessSendDevice
 
     @Override
     protected void handleInvalidTransaction(Transaction trans) {
-        logger.log(Level.INFO, "Transação ignorada. Tipo não é LB_ENTRY_REPLY.");
+        logger.log(Level.INFO, "Acceptable trans: LB_ENTRY_REPLY.");
     }
 
 }

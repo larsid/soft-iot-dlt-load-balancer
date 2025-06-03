@@ -30,7 +30,7 @@ public class ProcessMultiLayerSendDeviceState extends AbstractProcessSendDeviceS
 
     @Override
     protected void handleInvalidTransaction(Transaction trans) {
-        logger.log(Level.INFO, "Transação ignorada. LB_MULTI_DEVICE_RESPONSE.");
+        logger.log(Level.INFO, "Acceptable trans: LB_MULTI_DEVICE_RESPONSE.");
     }
 
 }

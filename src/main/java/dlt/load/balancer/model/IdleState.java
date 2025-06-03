@@ -37,22 +37,17 @@ public class IdleState extends AbstractBalancerState {
 
     @Override
     protected void handleInvalidTransaction(Transaction trans) {
-        logger.log(Level.INFO, "Transação ignorada. Tipo não é LB_ENTRY nem LB_MULTI_DEVICE_REQUEST.");
+        logger.log(Level.INFO, "Acceptable trans: LB_ENTRY or LB_MULTI_REQUEST.");
     }
 
     @Override
     public void handleValidTransaction(Transaction transaction) {
 
-        if (transaction.isLoopback(source)) {
-            logger.info("Solicitação interna de balancemaento iniciada.");
-            this.balancer.transitionTo(new WaitingLBReplyState(balancer));
-            return;
-        }
-
         if (!this.balancer.canReciveNewDevice()) {
-            logger.info("Gateway indisponível para receber novos devices.");
+            logger.info("This gateway is not avaliable to recive new devices.");
             return;
         }
+        
         boolean isMultiLayer = this.balancer.isMultiLayerBalancer();
 
         String transactionSender = transaction.getSource();

@@ -6,6 +6,7 @@ import dlt.client.tangle.hornet.model.transactions.Reply;
 import dlt.client.tangle.hornet.model.transactions.Request;
 import dlt.client.tangle.hornet.model.transactions.TargetedTransaction;
 import dlt.client.tangle.hornet.model.transactions.Transaction;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -36,7 +37,7 @@ public class WaitingLBRequestState extends AbstractBalancerState {
 
     @Override
     protected void handleInvalidTransaction(Transaction trans) {
-        logger.info("Transação ignorada. Esperado LB*_REQUEST.");
+        logger.info("Acceptable trans: LB_REQUEST or LB_MULTI_DEVICE_REQUEST.");
     }
 
     @Override
@@ -54,7 +55,7 @@ public class WaitingLBRequestState extends AbstractBalancerState {
                 : new Reply(source, group, transactionSender);
         
         this.balancer.sendTransaction(reply);
-        logger.info("LB_REPLY enviado.");
+        logger.log(Level.INFO, "{0} Sended.", reply.getType());
         this.balancer.transitionTo(new IdleState(balancer));
     }
     

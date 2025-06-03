@@ -173,12 +173,17 @@ public class Balancer implements ILedgerSubscriber, Runnable {
         Long maxDeviceCount = this.configs.getLoadLimit();
         boolean isMultiLayerBalancer = this.isMultiLayerBalancer();
 
-        if (currentDeviceCount < maxDeviceCount || this.state.isBalancing()) {
+        if (this.state.isBalancing()){
+            return;
+        }
+        
+        if (currentDeviceCount < maxDeviceCount) {
             if (isMultiLayerBalancer) {
                 this.messageMultiLayerSentCounter = 0;
                 return;
             }
             this.messageSingleLayerSentCounter = 0;
+            return;
         }
 
         String sourceIdentifier = this.buildSource();
@@ -203,6 +208,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
 
         if (this.messageSingleLayerSentCounter < MAX_ATTEMPTS_SEND_START_BALANCE) {
             logger.log(Level.INFO, "Solicitação interna de balanceamento de camada unica nº {0} iniciada.", messageSingleLayerSentCounter);
+            
             startBalanceTransactionSignal = new Status(sourceIdentifier, targetGroup, true, currentDeviceCount, transaction.getAvgLoad(), false);
             this.sendTransaction(startBalanceTransactionSignal);
             this.transitionTo(new WaitingLBReplyState(this));

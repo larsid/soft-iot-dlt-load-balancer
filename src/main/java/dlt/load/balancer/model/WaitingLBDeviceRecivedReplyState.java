@@ -46,7 +46,6 @@ public class WaitingLBDeviceRecivedReplyState extends AbstractBalancerState {
     @Override
     protected void handleValidTransaction(Transaction transaction) {
         if (!((TargetedTransaction) transaction).isSameTarget(source)) {
-            //CONSIDERAR NECESSIDADE DE REINICIAR O TIMEOUT
             return;
         }
         this.balancer.cancelTimeout();

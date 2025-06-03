@@ -39,9 +39,6 @@ public class WaitingLBReplyState extends AbstractBalancerState {
     @Override
     protected void handleValidTransaction(Transaction transaction) {
         if (!((TargetedTransaction) transaction).isSameTarget(source)) {
-//            Reavaliar a necessidade reiniciar o tempo de espera pela resposta.
-//            logger.info("LB_ENTRY_REPLY com target diferente. Timeout reiniciado.");
-//            this.balancer.transitionTo(this);
             return;
         }
         BalancerState nextState = transaction.isMultiLayerTransaction() 

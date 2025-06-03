@@ -27,11 +27,6 @@ public abstract class AbstractBalancerState implements BalancerState {
     @Override
     public abstract void onEnter();
     
-    @Override
-    public boolean isBalancing(){
-        return true;
-    }
-    
     protected abstract boolean isValidTransaction(Transaction transaction);
 
     protected abstract void handleInvalidTransaction(Transaction trans);
@@ -61,9 +56,7 @@ public abstract class AbstractBalancerState implements BalancerState {
             return;
         }
 
-        if (isLoopback 
-                && (!transaction.is(TransactionType.LB_ENTRY) 
-                || !transaction.is(TransactionType.LB_MULTI_REQUEST))){
+        if (isLoopback && !this.canProcessLoopback(transaction)){
             return;
         }
         
@@ -83,5 +76,10 @@ public abstract class AbstractBalancerState implements BalancerState {
                 this.getClass().getSimpleName());
 
         balancer.transitionTo(new IdleState(balancer));
+    }
+
+    @Override
+    public boolean canProcessLoopback(Transaction transaction) {
+        return false;
     }
 }

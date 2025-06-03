@@ -47,8 +47,10 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
             logger.log(Level.INFO, "Device selecionado para envio: {0}", deviceJson);
             logger.info("LB_REQUEST enviado com sucesso.");
             this.transiteToNextState();
-        } catch (IOException | NoSuchElementException ex) {
+        } catch (IOException ex) {
             logger.log(Level.SEVERE, null, ex);
+        } catch (NoSuchElementException ex){
+            logger.warning("AbstractProcessSendDeviceState - Device list is empty.");
         }
         this.updateQtyResendTransaction();
     }
@@ -77,4 +79,5 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
     }
 
     protected abstract Transaction buildTransaction(String deviceJson, String sender);
+
 }

@@ -10,9 +10,9 @@ public interface BalancerState {
 
     void onEnter();
 
-    boolean isBalancing();
-
     void handle(Transaction transaction);
 
     void onTimeout();
+    
+    boolean canProcessLoopback(Transaction transaction);
 }

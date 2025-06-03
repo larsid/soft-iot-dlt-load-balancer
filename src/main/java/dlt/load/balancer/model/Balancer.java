@@ -169,20 +169,25 @@ public class Balancer implements ILedgerSubscriber, Runnable {
 
     public void updateInternalStatus(Status transaction) {
         this.internalStatus = transaction;
-        double currentDeviceCount = transaction.getLastLoad();
-        Long maxDeviceCount = this.configs.getLoadLimit();
-        boolean isMultiLayerBalancer = this.isMultiLayerBalancer();
 
-        if (this.state.isBalancing() || currentDeviceCount == maxDeviceCount){
-            return;
-        }
-        
-        if (currentDeviceCount < maxDeviceCount) {
+        double currentDeviceLoad = transaction.getLastLoad();
+        double deviceLoadLimit = this.configs.getLoadLimit().doubleValue();
+
+        boolean isMultiLayerBalancer = this.isMultiLayerBalancer();
+        boolean isBalanced = currentDeviceLoad <= deviceLoadLimit;
+
+        if (isBalanced) {
             if (isMultiLayerBalancer) {
                 this.messageMultiLayerSentCounter = 0;
-                return;
+            } else {
+                this.messageSingleLayerSentCounter = 0;
             }
-            this.messageSingleLayerSentCounter = 0;
+            return;
+        }
+
+        boolean isCurrentlyIdle = this.state instanceof IdleState;
+
+        if (!isCurrentlyIdle) {
             return;
         }
 
@@ -197,8 +202,8 @@ public class Balancer implements ILedgerSubscriber, Runnable {
 
         if (this.messageSingleLayerSentCounter < MAX_ATTEMPTS_SEND_START_BALANCE) {
             logger.log(Level.INFO, "Solicitação interna de balanceamento de camada unica nº {0} iniciada.", messageSingleLayerSentCounter);
-            
-            startBalanceTransactionSignal = new Status(sourceIdentifier, targetGroup, true, currentDeviceCount, transaction.getAvgLoad(), false);
+
+            startBalanceTransactionSignal = new Status(sourceIdentifier, targetGroup, true, currentDeviceLoad, transaction.getAvgLoad(), false);
             this.sendTransaction(startBalanceTransactionSignal);
             this.transitionTo(new WaitingLBReplyState(this));
             this.messageSingleLayerSentCounter++;

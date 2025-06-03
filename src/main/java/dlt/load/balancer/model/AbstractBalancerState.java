@@ -26,7 +26,12 @@ public abstract class AbstractBalancerState implements BalancerState {
 
     @Override
     public abstract void onEnter();
-
+    
+    @Override
+    public boolean isBalancing(){
+        return true;
+    }
+    
     protected abstract boolean isValidTransaction(Transaction transaction);
 
     protected abstract void handleInvalidTransaction(Transaction trans);
@@ -52,12 +57,13 @@ public abstract class AbstractBalancerState implements BalancerState {
             if (!isLoopback) {
                 return;
             }
-            logger.info("Atualizando status interno.");
-            this.balancer.updateInternalStatus((Status)transaction);
+            this.balancer.updateInternalStatus((Status) transaction);
             return;
         }
 
-        if (isLoopback && !transaction.is(TransactionType.LB_ENTRY)){
+        if (isLoopback 
+                && (!transaction.is(TransactionType.LB_ENTRY) 
+                || !transaction.is(TransactionType.LB_MULTI_REQUEST))){
             return;
         }
         

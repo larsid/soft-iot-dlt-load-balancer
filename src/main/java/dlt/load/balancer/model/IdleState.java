@@ -25,9 +25,14 @@ public class IdleState extends AbstractBalancerState {
     }
 
     @Override
+    public boolean isBalancing() {
+        return false;
+    }
+
+    @Override
     protected boolean isValidTransaction(Transaction transaction) {
         return transaction.is(TransactionType.LB_ENTRY)
-                || transaction.is(TransactionType.LB_MULTI_DEVICE_REQUEST);
+                || transaction.is(TransactionType.LB_MULTI_REQUEST);
     }
 
     @Override
@@ -37,7 +42,6 @@ public class IdleState extends AbstractBalancerState {
 
     @Override
     public void handleValidTransaction(Transaction transaction) {
-        boolean isMultiLayer = transaction.isMultiLayerTransaction();
 
         if (transaction.isLoopback(source)) {
             logger.info("Solicitação interna de balancemaento iniciada.");
@@ -49,6 +53,7 @@ public class IdleState extends AbstractBalancerState {
             logger.info("Gateway indisponível para receber novos devices.");
             return;
         }
+        boolean isMultiLayer = this.balancer.isMultiLayerBalancer();
 
         String transactionSender = transaction.getSource();
 
@@ -59,4 +64,5 @@ public class IdleState extends AbstractBalancerState {
         this.balancer.sendTransaction(reply);
         this.balancer.transitionTo(new WaitingLBRequestState(balancer, isMultiLayer));
     }
+
 }

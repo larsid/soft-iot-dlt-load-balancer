@@ -21,6 +21,7 @@ import br.uefs.larsid.extended.mapping.devices.services.IDevicePropertiesManager
 import br.uefs.larsid.extended.mapping.devices.tatu.DeviceWrapper;
 import br.ufba.dcc.wiser.soft_iot.entities.Device;
 import dlt.auth.services.IPublisher;
+import dlt.client.tangle.hornet.model.transactions.LBMultiRequest;
 import dlt.client.tangle.hornet.model.transactions.Status;
 import dlt.client.tangle.hornet.model.transactions.Transaction;
 import dlt.client.tangle.hornet.services.ILedgerSubscriber;
@@ -50,10 +51,18 @@ public class Balancer implements ILedgerSubscriber, Runnable {
     private final BalancerConfigs configs;
     private static final Logger logger = Logger.getLogger(Balancer.class.getName());
 
+    private Long lastAttemptStartBalanceTime;
+    private int messageSingleLayerSentCounter;
+    private int messageMultiLayerSentCounter;
+    private final int MAX_ATTEMPTS_SEND_START_BALANCE;
+
     private BalancerState state;
 
     public Balancer() {
         this.isSubscribed = false;
+        this.messageSingleLayerSentCounter = 0;
+        this.messageMultiLayerSentCounter = 0;
+        this.MAX_ATTEMPTS_SEND_START_BALANCE = 3;
         this.configs = new BalancerConfigs();
     }
 
@@ -112,12 +121,14 @@ public class Balancer implements ILedgerSubscriber, Runnable {
         }
     }
 
-    protected void sendTransaction(Transaction transaction) {
+    protected boolean sendTransaction(Transaction transaction) {
         try {
             this.connector.put(transaction);
+            return true;
         } catch (InterruptedException ex) {
             logger.info("Load Balancer - Error commit transaction.");
             Logger.getLogger(Balancer.class.getName()).log(Level.SEVERE, null, ex);
+            return false;
         }
     }
 
@@ -155,16 +166,62 @@ public class Balancer implements ILedgerSubscriber, Runnable {
             logger.log(Level.WARNING, "Exception occurred while adding a new device.", ioe);
         }
     }
-
-    public BalancerState getState() {
-        return this.state;
-    }
-
-    protected void updateInternalStatus(Status transaction) {
+    
+    public void updateInternalStatus(Status transaction) {
         this.internalStatus = transaction;
+        double currentDeviceCount = transaction.getLastLoad();
+        Long maxDeviceCount = this.configs.getLoadLimit();
+        boolean isMultiLayerBalancer = this.isMultiLayerBalancer();
+
+        if (currentDeviceCount < maxDeviceCount || this.state.isBalancing()) {
+            if (isMultiLayerBalancer) {
+                this.messageMultiLayerSentCounter = 0;
+                return;
+            }
+            this.messageSingleLayerSentCounter = 0;
+        }
+        
+        String sourceIdentifier = this.buildSource();
+        String targetGroup = this.groupManager.getGroup();
+        Long balanceAttemptIntervalMillis = this.configs.getLBEntryResponseTimeout();
+
+        if (lastAttemptStartBalanceTime == null) {
+            this.lastAttemptStartBalanceTime = System.currentTimeMillis();
+        }
+
+        boolean canInitiateBalancing = System.currentTimeMillis() > this.lastAttemptStartBalanceTime + balanceAttemptIntervalMillis;
+
+        if (!canInitiateBalancing) {
+            return;
+        }
+
+        Transaction startBalanceTransactionSignal;
+
+        if (!isMultiLayerBalancer && this.messageSingleLayerSentCounter == MAX_ATTEMPTS_SEND_START_BALANCE) {
+            this.messageSingleLayerSentCounter = 0;
+        }
+
+        if (this.messageSingleLayerSentCounter < MAX_ATTEMPTS_SEND_START_BALANCE) {
+            startBalanceTransactionSignal = new Status(sourceIdentifier, targetGroup, true, currentDeviceCount, transaction.getAvgLoad(), false);
+            this.sendTransaction(startBalanceTransactionSignal);
+            this.lastAttemptStartBalanceTime = System.currentTimeMillis();
+            this.messageSingleLayerSentCounter++;
+            return;
+        }
+
+        if (this.messageMultiLayerSentCounter == MAX_ATTEMPTS_SEND_START_BALANCE) {
+            this.messageMultiLayerSentCounter = 0;
+        }
+
+        if (this.messageMultiLayerSentCounter < MAX_ATTEMPTS_SEND_START_BALANCE) {
+            startBalanceTransactionSignal = new LBMultiRequest(sourceIdentifier, targetGroup);
+            this.sendTransaction(startBalanceTransactionSignal);
+            this.lastAttemptStartBalanceTime = System.currentTimeMillis();
+            this.messageMultiLayerSentCounter++;
+        }
     }
 
-    protected Short qtyMaxTimeResendTransaction() {
+    protected Long qtyMaxTimeResendTransaction() {
         return this.configs.getMaxTryResendTransaction();
     }
 
@@ -206,7 +263,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
         String oldStateName = (this.state != null) ? this.state.getClass().getSimpleName() : "null";
         String newStateName = newState.getClass().getSimpleName();
 
-        logger.log(Level.INFO, "Transição de estado: {1} -> {2}", new Object[]{oldStateName, newStateName});
+        logger.log(Level.INFO, "Transição de estado: {0} -> {1}", new Object[]{oldStateName, newStateName});
 
         this.state = newState;
         this.state.onEnter();
@@ -246,8 +303,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
             logger.log(Level.INFO, "Load balancer - New message with id: {0} is Invalid", messageId);
             return;
         }
-        Transaction transaction = (Transaction) trans;
-        this.state.handle(transaction);
+        this.state.handle((Transaction) trans);
     }
 
     /* Thread para verificar o IP do client tangle e se inscrever nos tópicos

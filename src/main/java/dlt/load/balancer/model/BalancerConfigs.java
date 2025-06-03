@@ -1,6 +1,5 @@
 package dlt.load.balancer.model;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -20,8 +19,10 @@ public class BalancerConfigs {
 
     private final Long TIMEOUT_LB_REPLY;
     private final Long TIMEOUT_GATEWAY;
+    private final Long LB_ENTRY_TIMEOUT;
 
-    private final Short maxTryResendTransaction;
+    private final Long maxQtyConnectedDevices;
+    private final Long maxTryResendTransaction;
 
     private final Long maxPublishMessageInterval;
 
@@ -37,7 +38,9 @@ public class BalancerConfigs {
         this.interestedTopics = this.readInterestedTopics();
         this.TIMEOUT_GATEWAY = this.readTimeoutGateway();
         this.TIMEOUT_LB_REPLY = this.readTimeoutLBReply();
+        this.LB_ENTRY_TIMEOUT = this.readTimeoutLBEntry();
         this.maxTryResendTransaction = this.readMaxTryResendTransaction();
+        this.maxQtyConnectedDevices = this.readLoadLimit();
     }
 
     public Long getLBStartReplyTimeout() {
@@ -46,6 +49,15 @@ public class BalancerConfigs {
 
     public Long getTimeoutGateway() {
         return TIMEOUT_GATEWAY;
+    }
+    
+    public Long getLBEntryResponseTimeout(){
+        return LB_ENTRY_TIMEOUT;
+    }
+    
+
+    public Long getLoadLimit() {
+        return maxQtyConnectedDevices;
     }
 
     public Boolean isBalanceable() {
@@ -67,8 +79,8 @@ public class BalancerConfigs {
     public boolean validPublishMessageInterval(Long publishTime) {
         return (System.currentTimeMillis() - publishTime) < maxPublishMessageInterval;
     }
-    
-    public Short getMaxTryResendTransaction(){
+
+    public Long getMaxTryResendTransaction() {
         return maxTryResendTransaction;
     }
 
@@ -98,7 +110,7 @@ public class BalancerConfigs {
         }
         return port;
     }
-    
+
     private Long readMaxPublishMessageIntervalEnv() {
         return readEnvLongOrDefault("VALID_MESSAGE_INTERVAL", 15000L);
     }
@@ -111,8 +123,16 @@ public class BalancerConfigs {
         return readEnvLongOrDefault("TIMEOUT_LB_REPLY", 20000L);
     }
 
-    private Short readMaxTryResendTransaction() {
-        return this.readEnvLongOrDefault("MAX_TRY_RESEND_TRANS", 3L).shortValue();
+    private Long readTimeoutLBEntry() {
+        return readEnvLongOrDefault("LB_ENTRY_TIMEOUT", 20000L);
+    }
+
+    private Long readMaxTryResendTransaction() {
+        return this.readEnvLongOrDefault("MAX_TRY_RESEND_TRANS", 3L);
+    }
+
+    private Long readLoadLimit() {
+        return this.readEnvLongOrDefault("LOAD_LIMIT", 10L);
     }
 
     private Long readEnvLongOrDefault(String envName, Long defaultValue) {
@@ -160,17 +180,20 @@ public class BalancerConfigs {
                 "LB_MULTI_DEVICE_RESPONSE"
         );
     }
-    
+
     @Override
     public String toString() {
-        return "BalancerConfigs{" + "balanceable=" + balanceable 
-                + ", multiLayerBalancing=" + multiLayerBalancing
-                + ", mqttPort=" + mqttPort
-                + ", TIMEOUT_LB_REPLY=" + TIMEOUT_LB_REPLY 
-                + ", TIMEOUT_GATEWAY=" + TIMEOUT_GATEWAY
-                + ", maxTryResendTransaction=" + maxTryResendTransaction
-                + ", maxPublishMessageInterval=" + maxPublishMessageInterval 
-                + ", interestedTopics=" + Arrays.toString(this.interestedTopics.toArray()) + '}';
+        return "BalancerConfigs{" + "balanceable=" + balanceable + 
+                ", multiLayerBalancing=" + multiLayerBalancing + 
+                ", mqttPort=" + mqttPort + 
+                ", TIMEOUT_LB_REPLY=" + TIMEOUT_LB_REPLY + 
+                ", TIMEOUT_GATEWAY=" + TIMEOUT_GATEWAY + 
+                ", LB_ENTRY_TIMEOUT=" + LB_ENTRY_TIMEOUT + 
+                ", maxQtyConnectedDevices=" + maxQtyConnectedDevices + 
+                ", maxTryResendTransaction=" + maxTryResendTransaction + 
+                ", maxPublishMessageInterval=" + maxPublishMessageInterval + '}';
     }
+
+
 
 }

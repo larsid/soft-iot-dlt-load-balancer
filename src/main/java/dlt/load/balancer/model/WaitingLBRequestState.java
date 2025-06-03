@@ -42,10 +42,9 @@ public class WaitingLBRequestState extends AbstractBalancerState {
     @Override
     protected void handleValidTransaction(Transaction transaction) {
         if (!((TargetedTransaction) transaction).isSameTarget(source)) {
-            //logger.info("LB_REQUEST com target errado. Timeout reiniciado."); 
-            // Verificar a necessidade de reiniciar timer
             return;
         }
+        
         String device = ((Request) transaction).getDevice();
         this.balancer.receiveNewDevice(device);
         String transactionSender = transaction.getSource();

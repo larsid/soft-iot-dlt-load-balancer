@@ -188,17 +188,6 @@ public class Balancer implements ILedgerSubscriber, Runnable {
 
         String sourceIdentifier = this.buildSource();
         String targetGroup = this.groupManager.getGroup();
-        Long balanceAttemptIntervalMillis = this.configs.getLBEntryResponseTimeout();
-
-        if (lastAttemptStartBalanceTime == null) {
-            this.lastAttemptStartBalanceTime = System.currentTimeMillis();
-        }
-
-        boolean canInitiateBalancing = System.currentTimeMillis() > this.lastAttemptStartBalanceTime + balanceAttemptIntervalMillis;
-
-        if (!canInitiateBalancing) {
-            return;
-        }
 
         Transaction startBalanceTransactionSignal;
 
@@ -212,7 +201,6 @@ public class Balancer implements ILedgerSubscriber, Runnable {
             startBalanceTransactionSignal = new Status(sourceIdentifier, targetGroup, true, currentDeviceCount, transaction.getAvgLoad(), false);
             this.sendTransaction(startBalanceTransactionSignal);
             this.transitionTo(new WaitingLBReplyState(this));
-            this.lastAttemptStartBalanceTime = System.currentTimeMillis();
             this.messageSingleLayerSentCounter++;
             return;
         }
@@ -227,7 +215,6 @@ public class Balancer implements ILedgerSubscriber, Runnable {
             startBalanceTransactionSignal = new LBMultiRequest(sourceIdentifier, targetGroup);
             this.sendTransaction(startBalanceTransactionSignal);
             this.transitionTo(new WaitingLBReplyState(this));
-            this.lastAttemptStartBalanceTime = System.currentTimeMillis();
             this.messageMultiLayerSentCounter++;
         }
 

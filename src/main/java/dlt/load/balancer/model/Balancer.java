@@ -173,7 +173,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
         Long maxDeviceCount = this.configs.getLoadLimit();
         boolean isMultiLayerBalancer = this.isMultiLayerBalancer();
 
-        if (this.state.isBalancing()){
+        if (this.state.isBalancing() || currentDeviceCount == maxDeviceCount){
             return;
         }
         

@@ -28,12 +28,12 @@ public class WaitingLBReplyState extends AbstractBalancerState {
     protected boolean isValidTransaction(Transaction transaction) {
         return transaction.is(TransactionType.LB_ENTRY_REPLY) 
                 || (transaction.isMultiLayerTransaction() 
-                && transaction.is(TransactionType.LB_MULTI_DEVICE_RESPONSE));
+                && transaction.is(TransactionType.LB_MULTI_RESPONSE));
     }
 
     @Override
     protected void handleInvalidTransaction(Transaction trans) {
-        logger.log(Level.INFO, "Acceptable trans: LB_ENTRY_REPLY or LB_MULTI_DEVICE_RESPONSE.");
+        logger.log(Level.INFO, "Acceptable trans: LB_ENTRY_REPLY or LB_MULTI_RESPONSE.");
     }
 
     @Override

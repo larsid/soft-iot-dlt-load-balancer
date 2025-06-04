@@ -35,7 +35,8 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
 
     @Override
     protected void handleValidTransaction(Transaction transaction) {
-        logger.info("LB_*DEVICE*RESPONSE recebido com target correto. Iniciando envio de LB_REQUEST.");
+        logger.info("LB_*RESPONSE recebido com target correto. Iniciando envio de LB_*REQUEST.");
+
         Transaction transactionRequest;
         String sender = transaction.getSource();
         try {
@@ -49,7 +50,7 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
             this.transiteToNextState();
         } catch (IOException ex) {
             logger.log(Level.SEVERE, null, ex);
-        } catch (NoSuchElementException ex){
+        } catch (NoSuchElementException ex) {
             logger.warning("AbstractProcessSendDeviceState - Device list is empty.");
         }
         this.updateQtyResendTransaction();

@@ -1,7 +1,7 @@
 package dlt.load.balancer.model;
 
 import dlt.client.tangle.hornet.enums.TransactionType;
-import dlt.client.tangle.hornet.model.transactions.LBMultiDeviceResponse;
+import dlt.client.tangle.hornet.model.transactions.LBMultiDevice;
 import dlt.client.tangle.hornet.model.transactions.Transaction;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -19,18 +19,18 @@ public class ProcessMultiLayerSendDeviceState extends AbstractProcessSendDeviceS
 
     @Override
     protected Transaction buildTransaction(String deviceJson, String sender) {
-        return new LBMultiDeviceResponse(source, group, deviceJson, sender);
+        return new LBMultiDevice(source, group, deviceJson, sender);
     }
 
     @Override
     protected boolean isValidTransaction(Transaction transaction) {
         return transaction.isMultiLayerTransaction()
-                && transaction.is(TransactionType.LB_MULTI_DEVICE_RESPONSE);
+                && transaction.is(TransactionType.LB_MULTI_RESPONSE);
     }
 
     @Override
     protected void handleInvalidTransaction(Transaction trans) {
-        logger.log(Level.INFO, "Acceptable trans: LB_MULTI_DEVICE_RESPONSE.");
+        logger.log(Level.INFO, "Acceptable trans: LB_MULTI_RESPONSE.");
     }
 
 }

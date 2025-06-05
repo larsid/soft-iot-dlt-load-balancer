@@ -140,9 +140,11 @@ public class Balancer implements ILedgerSubscriber, Runnable {
             jsonPublish.addProperty("port", targetMqttPort);
             jsonPublish.addProperty("user", "karaf");
             jsonPublish.addProperty("password", "karaf");
-
+            
+            String topic = "dev/"+device.getId();
+            
             iPublisher.publish(
-                    device.getId(),
+                    topic,
                     "SET VALUE brokerMqtt{" + jsonPublish.toString() + "}"
             );
 

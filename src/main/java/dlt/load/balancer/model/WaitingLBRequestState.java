@@ -1,6 +1,7 @@
 package dlt.load.balancer.model;
 
 import dlt.client.tangle.hornet.enums.TransactionType;
+import dlt.client.tangle.hornet.model.transactions.LBMultiDevice;
 import dlt.client.tangle.hornet.model.transactions.LBMultiDeviceResponse;
 import dlt.client.tangle.hornet.model.transactions.Reply;
 import dlt.client.tangle.hornet.model.transactions.Request;
@@ -16,11 +17,9 @@ import java.util.logging.Logger;
 public class WaitingLBRequestState extends AbstractBalancerState {
 
     private static final Logger logger = Logger.getLogger(WaitingLBRequestState.class.getName());
-    private final boolean isMultiLayerState;
-    
-    public WaitingLBRequestState(Balancer balancer, boolean isMultiLayerState) {
+
+    public WaitingLBRequestState(Balancer balancer) {
         super(balancer);
-        this.isMultiLayerState = isMultiLayerState;
     }
     
     @Override
@@ -32,7 +31,7 @@ public class WaitingLBRequestState extends AbstractBalancerState {
     @Override
     protected boolean isValidTransaction(Transaction transaction) {
         return transaction.is(TransactionType.LB_REQUEST) 
-                || (this.isMultiLayerState && transaction.is(TransactionType.LB_MULTI_DEVICE_REQUEST));
+                || transaction.is(TransactionType.LB_MULTI_DEVICE_REQUEST);
     }
 
     @Override
@@ -46,11 +45,14 @@ public class WaitingLBRequestState extends AbstractBalancerState {
             return;
         }
         
-        String device = ((Request) transaction).getDevice();
+        String device = transaction.isMultiLayerTransaction() 
+                ? ((LBMultiDevice) transaction).getDevice()
+                : ((Request) transaction).getDevice();
+        
         this.balancer.receiveNewDevice(device);
         String transactionSender = transaction.getSource();
         
-        Transaction reply = this.isMultiLayerState 
+        Transaction reply = transaction.isMultiLayerTransaction()
                 ? new LBMultiDeviceResponse(source, group, device, transactionSender)
                 : new Reply(source, group, transactionSender);
         

@@ -43,16 +43,14 @@ public class IdleState extends AbstractBalancerState {
             return;
         }
         
-        boolean isMultiLayer = transaction.isMultiLayerTransaction();
-
         String transactionSender = transaction.getSource();
 
-        Transaction reply = isMultiLayer
+        Transaction reply = transaction.isMultiLayerTransaction()
                 ? new LBMultiResponse(source, group, transactionSender)
                 : new LBReply(source, group, transactionSender);
 
         this.balancer.sendTransaction(reply);
-        this.balancer.transitionTo(new WaitingLBRequestState(balancer, isMultiLayer));
+        this.balancer.transitionTo(new WaitingLBRequestState(balancer));
     }
     
     @Override

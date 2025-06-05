@@ -7,6 +7,7 @@ import java.util.logging.Logger;
 
 import br.uefs.larsid.extended.mapping.devices.tatu.DeviceWrapper;
 import br.ufba.dcc.wiser.soft_iot.entities.Device;
+import dlt.client.tangle.hornet.model.transactions.TargetedTransaction;
 import dlt.client.tangle.hornet.model.transactions.Transaction;
 
 /**
@@ -18,25 +19,36 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
     private static final Logger logger = Logger.getLogger(AbstractProcessSendDeviceState.class.getName());
 
     private Long qtyMaxResendTansaction;
-    private final Transaction transBeingProcessed;
     private Device deviceToRemove;
     private BalancerState waitingLBDeviceRecivedReplyState;
 
-    public AbstractProcessSendDeviceState(Balancer balancer, Transaction transaction) {
+    public AbstractProcessSendDeviceState(Balancer balancer) {
         super(balancer);
-        this.transBeingProcessed = transaction;
         this.qtyMaxResendTansaction = this.balancer.qtyMaxTimeResendTransaction();
     }
 
     @Override
     public void onEnter() {
-        this.handle(transBeingProcessed);
+        Long waitingTime = this.balancer.getLBStartReplyTimeWaiting();
+        this.balancer.scheduleTimeout(waitingTime);
     }
 
     @Override
     protected void handleValidTransaction(Transaction transaction) {
+        if(transaction == null){
+            logger.warning("VIXE");
+            return;
+        }
+        if (!(transaction instanceof TargetedTransaction)){
+            logger.log(Level.WARNING, "Transaction {0} recived but is not a targeted transaction", transaction.getType());
+            return;
+        }
+        String transTarget = ((TargetedTransaction) transaction).getTarget();
+        if (!this.source.equals(transTarget)){
+            return;
+        }
         logger.info("LB_*RESPONSE recebido com target correto. Iniciando envio de LB_*REQUEST.");
-
+        
         Transaction transactionRequest;
         String sender = transaction.getSource();
         try {
@@ -44,9 +56,7 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
             String deviceJson = DeviceWrapper.toJSON(deviceToRemove);
             transactionRequest = this.buildTransaction(deviceJson, sender);
             this.balancer.sendTransaction(transactionRequest);
-
-            logger.log(Level.INFO, "Device selecionado para envio: {0}", deviceJson);
-            logger.info("LB_REQUEST enviado com sucesso.");
+            this.handlePostSendTransaction();
             this.transiteToNextState();
         } catch (IOException ex) {
             logger.log(Level.SEVERE, null, ex);
@@ -76,9 +86,11 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
     }
 
     private void updateQtyResendTransaction() {
-        logger.log(Level.INFO, "Amount of resent attempts remaining:  ", --this.qtyMaxResendTansaction);
+        logger.log(Level.INFO, "Amount of resent attempts remaining: {0}", --this.qtyMaxResendTansaction);
     }
 
     protected abstract Transaction buildTransaction(String deviceJson, String sender);
+    
+    protected abstract void handlePostSendTransaction();
 
 }

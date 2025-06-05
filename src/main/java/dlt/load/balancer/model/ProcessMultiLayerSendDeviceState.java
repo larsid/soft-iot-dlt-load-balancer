@@ -13,8 +13,8 @@ import java.util.logging.Logger;
 public class ProcessMultiLayerSendDeviceState extends AbstractProcessSendDeviceState {
     private static final Logger logger = Logger.getLogger(ProcessMultiLayerSendDeviceState.class.getName());
 
-    public ProcessMultiLayerSendDeviceState(Balancer balancer, Transaction transaction) {
-        super(balancer, transaction);
+    public ProcessMultiLayerSendDeviceState(Balancer balancer) {
+        super(balancer);
     }
 
     @Override
@@ -31,6 +31,11 @@ public class ProcessMultiLayerSendDeviceState extends AbstractProcessSendDeviceS
     @Override
     protected void handleInvalidTransaction(Transaction trans) {
         logger.log(Level.INFO, "Acceptable trans: LB_MULTI_RESPONSE.");
+    }
+
+    @Override
+    protected void handlePostSendTransaction() {
+        logger.info("LB_MULTI_RESPONSE Sent successfully");
     }
 
 }

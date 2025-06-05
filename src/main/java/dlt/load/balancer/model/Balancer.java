@@ -51,7 +51,6 @@ public class Balancer implements ILedgerSubscriber, Runnable {
     private final BalancerConfigs configs;
     private static final Logger logger = Logger.getLogger(Balancer.class.getName());
 
-    private Long lastAttemptStartBalanceTime;
     private int messageSingleLayerSentCounter;
     private int messageMultiLayerSentCounter;
     private final int MAX_ATTEMPTS_SEND_START_BALANCE;
@@ -205,7 +204,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
 
             startBalanceTransactionSignal = new Status(sourceIdentifier, targetGroup, true, currentDeviceLoad, transaction.getAvgLoad(), false);
             this.sendTransaction(startBalanceTransactionSignal);
-            this.transitionTo(new WaitingLBReplyState(this));
+            this.transitionTo(new ProcessSingleLayerSendDeviceState(this));
             this.messageSingleLayerSentCounter++;
             return;
         }
@@ -219,7 +218,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
 
             startBalanceTransactionSignal = new LBMultiRequest(sourceIdentifier, targetGroup);
             this.sendTransaction(startBalanceTransactionSignal);
-            this.transitionTo(new WaitingLBReplyState(this));
+            this.transitionTo(new ProcessMultiLayerSendDeviceState(this));
             this.messageMultiLayerSentCounter++;
         }
 

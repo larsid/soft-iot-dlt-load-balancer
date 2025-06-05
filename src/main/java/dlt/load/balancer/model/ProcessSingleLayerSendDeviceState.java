@@ -14,8 +14,8 @@ public class ProcessSingleLayerSendDeviceState extends AbstractProcessSendDevice
 
     private static final Logger logger = Logger.getLogger(ProcessMultiLayerSendDeviceState.class.getName());
 
-    public ProcessSingleLayerSendDeviceState(Balancer balancer, Transaction transaction) {
-        super(balancer, transaction);
+    public ProcessSingleLayerSendDeviceState(Balancer balancer) {
+        super(balancer);
     }
 
     @Override
@@ -31,6 +31,11 @@ public class ProcessSingleLayerSendDeviceState extends AbstractProcessSendDevice
     @Override
     protected void handleInvalidTransaction(Transaction trans) {
         logger.log(Level.INFO, "Acceptable trans: LB_ENTRY_REPLY.");
+    }
+
+    @Override
+    protected void handlePostSendTransaction() {
+        logger.info("LB_ENTRY_REPLY Sent successfully");
     }
 
 }

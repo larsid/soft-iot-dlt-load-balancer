@@ -18,7 +18,7 @@ public abstract class AbstractBalancerState implements BalancerState {
 
     protected String source;
     protected String group;
-    
+
     protected AbstractBalancerState(Balancer balancer) {
         this.balancer = balancer;
         this.group = balancer.getGatewayGroup();
@@ -26,7 +26,7 @@ public abstract class AbstractBalancerState implements BalancerState {
 
     @Override
     public abstract void onEnter();
-    
+
     protected abstract boolean isValidTransaction(Transaction transaction);
 
     protected abstract void handleInvalidTransaction(Transaction trans);
@@ -56,16 +56,22 @@ public abstract class AbstractBalancerState implements BalancerState {
             return;
         }
 
-        if (isLoopback && !this.canProcessLoopback(transaction)){
+        if (isLoopback && !this.canProcessLoopback(transaction)) {
             return;
         }
-        
+
         if (!this.isValidTransaction(transaction)) {
             logger.log(Level.WARNING, "Recived trans type: {0} from {1}",
                     new Object[]{transaction.getType(), transaction.getSource()});
             this.handleInvalidTransaction(transaction);
             return;
         }
+
+        if (this.balancer.shouldDisplayPastTimeTransPublication()) {
+            String time = TimeFormatter.formatTimeElapsed(transaction.getPublishedAt());
+            logger.log(Level.INFO, "{0} - {1}", new Object[]{transaction.getType(), time});
+        }
+
         this.handleValidTransaction(transaction);
     }
 

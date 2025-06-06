@@ -140,12 +140,12 @@ public class Balancer implements ILedgerSubscriber, Runnable {
             jsonPublish.addProperty("port", targetMqttPort);
             jsonPublish.addProperty("user", "karaf");
             jsonPublish.addProperty("password", "karaf");
-            
-            String topic = "dev/"+device.getId();
-            
+
+            String topic = "dev/" + device.getId();
+
             iPublisher.publish(
                     topic,
-                    "SET VALUE brokerMqtt{" + jsonPublish.toString() + "}"
+                    "SET VALUE brokerMqtt" + jsonPublish.toString()
             );
 
             deviceManager.removeDevice(device.getId());
@@ -231,15 +231,21 @@ public class Balancer implements ILedgerSubscriber, Runnable {
     }
 
     protected Long getLBStartReplyTimeWaiting() {
-        return this.configs.getLBStartReplyTimeout();
+        return this.isMultiLayerBalancer() 
+                ? this.configs.getLBSingleStartReplyTimeout()
+                : this.configs.getLBMultiStartReplyTimeout();
     }
 
     protected Long getLBDeviceRecivedReplyTimeWaiting() {
-        return this.configs.getLBStartReplyTimeout() * 2;
+        return this.configs.getLBSingleStartReplyTimeout() * 2;
     }
 
     protected Long getLBRequestTimeWaiting() {
-        return this.configs.getLBStartReplyTimeout() * 2;
+        return this.configs.getLBSingleStartReplyTimeout() * 2;
+    }
+    
+    protected boolean shouldDisplayPastTimeTransPublication() {
+        return this.configs.shouldDisplayPastTimeTransPub();
     }
 
     protected String getGatewayGroup() {

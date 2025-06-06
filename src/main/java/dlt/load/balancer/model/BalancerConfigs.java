@@ -15,9 +15,10 @@ public class BalancerConfigs {
 
     private final Boolean balanceable;
     private final Boolean multiLayerBalancing;
+    private final Boolean displayPastTimeTransPub;
     private final String mqttPort;
 
-    private final Long TIMEOUT_LB_REPLY;
+    private final Long TIMEOUT_LB_SINGLE_REPLY, TIMEOUT_LB_MULTI_REPLY;
     private final Long TIMEOUT_GATEWAY;
     private final Long LB_ENTRY_TIMEOUT;
 
@@ -37,24 +38,29 @@ public class BalancerConfigs {
         this.maxPublishMessageInterval = this.readMaxPublishMessageIntervalEnv();
         this.interestedTopics = this.readInterestedTopics();
         this.TIMEOUT_GATEWAY = this.readTimeoutGateway();
-        this.TIMEOUT_LB_REPLY = this.readTimeoutLBReply();
+        this.TIMEOUT_LB_SINGLE_REPLY = this.readTimeoutLBSingleReply();
+        this.TIMEOUT_LB_MULTI_REPLY = this.readTimeoutLBMultiReply();
         this.LB_ENTRY_TIMEOUT = this.readTimeoutLBEntry();
         this.maxTryResendTransaction = this.readMaxTryResendTransaction();
         this.maxQtyConnectedDevices = this.readLoadLimit();
+        this.displayPastTimeTransPub = this.readShouldDisplayPastTime();
     }
 
-    public Long getLBStartReplyTimeout() {
-        return TIMEOUT_LB_REPLY;
+    public Long getLBSingleStartReplyTimeout() {
+        return TIMEOUT_LB_SINGLE_REPLY;
     }
 
-    public Long getTimeoutGateway() {
+    public Long getLBMultiStartReplyTimeout() {
+        return TIMEOUT_LB_MULTI_REPLY;
+    }
+
+    public Long getimeoutGateway() {
         return TIMEOUT_GATEWAY;
     }
-    
-    public Long getLBEntryResponseTimeout(){
+
+    public Long getLBEntryResponseTimeout() {
         return LB_ENTRY_TIMEOUT;
     }
-    
 
     public Long getLoadLimit() {
         return maxQtyConnectedDevices;
@@ -84,22 +90,20 @@ public class BalancerConfigs {
         return maxTryResendTransaction;
     }
 
+    public boolean shouldDisplayPastTimeTransPub() {
+        return this.displayPastTimeTransPub;
+    }
+
+    private Boolean readShouldDisplayPastTime() {
+        return this.readEnvBooleanOrDefault("DISPLAY_PAST_TRANS_TIME", true);
+    }
+
     private Boolean readBalanceableEnv() {
-        String isBalanceableValue = System.getenv("IS_BALANCEABLE");
-        if (isBalanceableValue == null) {
-            logger.warning("Load balancer configs - IS_BALANCEABLE env var is not defined.");
-            return true;
-        }
-        return isBalanceableValue.equals("1");
+        return this.readEnvBooleanOrDefault("IS_BALANCEABLE", true);
     }
 
     private Boolean readMultiBalanceableEnv() {
-        String isMultiLayer = System.getenv("IS_MULTI_LAYER");
-        if (isMultiLayer == null) {
-            logger.warning("Load balancer configs - IS_MULTI_LAYER env var is not defined.");
-            return true;
-        }
-        return isMultiLayer.equals("1");
+        return this.readEnvBooleanOrDefault("IS_MULTI_LAYER", true);
     }
 
     private String readMqttPortEnv() {
@@ -119,8 +123,12 @@ public class BalancerConfigs {
         return readEnvLongOrDefault("TIMEOUT_GATEWAY", 40000L);
     }
 
-    private Long readTimeoutLBReply() {
-        return readEnvLongOrDefault("TIMEOUT_LB_REPLY", 20000L);
+    private Long readTimeoutLBSingleReply() {
+        return readEnvLongOrDefault("TIMEOUT_LB_SINGLE_REPLY", 20000L);
+    }
+    
+    private Long readTimeoutLBMultiReply(){
+        return readEnvLongOrDefault("TIMEOUT_LB_MULTI_REPLY", 20000L);
     }
 
     private Long readTimeoutLBEntry() {
@@ -147,6 +155,15 @@ public class BalancerConfigs {
         } catch (NumberFormatException nfe) {
             return defaultValue;
         }
+    }
+
+    private boolean readEnvBooleanOrDefault(String envName, Boolean defaultValue) {
+        String isMultiLayer = System.getenv(envName);
+        if (isMultiLayer == null) {
+            logger.log(Level.WARNING, "Load balancer configs - {0} env var is not defined.", envName);
+            return defaultValue;
+        }
+        return isMultiLayer.equals("1");
     }
 
     private List<String> readInterestedTopics() {
@@ -183,17 +200,15 @@ public class BalancerConfigs {
 
     @Override
     public String toString() {
-        return "BalancerConfigs{" + "balanceable=" + balanceable + 
-                ", multiLayerBalancing=" + multiLayerBalancing + 
-                ", mqttPort=" + mqttPort + 
-                ", TIMEOUT_LB_REPLY=" + TIMEOUT_LB_REPLY + 
-                ", TIMEOUT_GATEWAY=" + TIMEOUT_GATEWAY + 
-                ", LB_ENTRY_TIMEOUT=" + LB_ENTRY_TIMEOUT + 
-                ", maxQtyConnectedDevices=" + maxQtyConnectedDevices + 
-                ", maxTryResendTransaction=" + maxTryResendTransaction + 
-                ", maxPublishMessageInterval=" + maxPublishMessageInterval + '}';
+        return "BalancerConfigs{" + "balanceable=" + balanceable
+                + ", multiLayerBalancing=" + multiLayerBalancing
+                + ", mqttPort=" + mqttPort
+                + ", TIMEOUT_LB_REPLY=" + TIMEOUT_LB_SINGLE_REPLY
+                + ", TIMEOUT_GATEWAY=" + TIMEOUT_GATEWAY
+                + ", LB_ENTRY_TIMEOUT=" + LB_ENTRY_TIMEOUT
+                + ", maxQtyConnectedDevices=" + maxQtyConnectedDevices
+                + ", maxTryResendTransaction=" + maxTryResendTransaction
+                + ", maxPublishMessageInterval=" + maxPublishMessageInterval + '}';
     }
-
-
 
 }

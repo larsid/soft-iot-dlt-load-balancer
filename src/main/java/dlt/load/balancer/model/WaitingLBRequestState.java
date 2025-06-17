@@ -17,11 +17,13 @@ import java.util.logging.Logger;
 public class WaitingLBRequestState extends AbstractBalancerState {
 
     private static final Logger logger = Logger.getLogger(WaitingLBRequestState.class.getName());
+    private final String overloadedGatewaySource;
 
-    public WaitingLBRequestState(Balancer balancer) {
+    public WaitingLBRequestState(Balancer balancer, String overloadedGateway) {
         super(balancer);
+        this.overloadedGatewaySource = overloadedGateway;
     }
-    
+
     @Override
     public void onEnter() {
         Long LBRequestTimeWaiting = this.balancer.getLBRequestTimeWaiting();
@@ -30,7 +32,7 @@ public class WaitingLBRequestState extends AbstractBalancerState {
 
     @Override
     protected boolean isValidTransaction(Transaction transaction) {
-        return transaction.is(TransactionType.LB_REQUEST) 
+        return transaction.is(TransactionType.LB_REQUEST)
                 || transaction.is(TransactionType.LB_MULTI_DEVICE_REQUEST);
     }
 
@@ -41,25 +43,36 @@ public class WaitingLBRequestState extends AbstractBalancerState {
 
     @Override
     protected void handleValidTransaction(Transaction transaction) {
-        if (!((TargetedTransaction) transaction).isSameTarget(source)) {
+        TargetedTransaction targetedTrans = ((TargetedTransaction) transaction);
+
+        if (!targetedTrans.getSource().equals(this.overloadedGatewaySource)) {
+            logger.log(Level.INFO, "Ignorando resposta de um gateway inesperado ({0}). Esperando por {1}.",
+                    new Object[]{transaction.getSource(), this.overloadedGatewaySource});
             return;
         }
-        
-        String device = transaction.isMultiLayerTransaction() 
+
+        if (!targetedTrans.isSameTarget(source)) {
+            logger.log(Level.INFO, "O gateway {0} escolheu outro alvo ({1}). Retornando ao estado Idle.",
+                    new Object[]{this.overloadedGatewaySource, targetedTrans.getTarget()});
+
+            this.balancer.transitionTo(new IdleState(this.balancer));
+            return;
+        }
+
+        String device = transaction.isMultiLayerTransaction()
                 ? ((LBMultiDevice) transaction).getDevice()
                 : ((Request) transaction).getDevice();
-        
+
         this.balancer.receiveNewDevice(device);
         String transactionSender = transaction.getSource();
-        
+
         Transaction reply = transaction.isMultiLayerTransaction()
                 ? new LBMultiDeviceResponse(source, group, device, transactionSender)
                 : new Reply(source, group, transactionSender);
-        
+
         this.balancer.sendTransaction(reply);
         logger.log(Level.INFO, "{0} Sended.", reply.getType());
         this.balancer.transitionTo(new IdleState(balancer));
     }
-    
-    
+
 }

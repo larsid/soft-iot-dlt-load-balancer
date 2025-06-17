@@ -21,11 +21,9 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
     private Long qtyMaxResendTansaction;
     private Device deviceToRemove;
     private BalancerState waitingLBDeviceRecivedReplyState;
-    private final String overloadedGatewaySource;
 
-    public AbstractProcessSendDeviceState(Balancer balancer, String gatewaySource) {
+    public AbstractProcessSendDeviceState(Balancer balancer) {
         super(balancer);
-        this.overloadedGatewaySource = gatewaySource;
         this.qtyMaxResendTansaction = this.balancer.qtyMaxTimeResendTransaction();
     }
 
@@ -46,17 +44,8 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
             return;
         }
         TargetedTransaction targetedTransaction = ((TargetedTransaction) transaction);
-
-        String transSource = targetedTransaction.getSource();
-        if (!transSource.equals(this.overloadedGatewaySource)) {
-            return;
-        }
         
         if (!targetedTransaction.isSameTarget(this.source)) {
-            logger.log(Level.INFO, "O gateway {1} escolheu outro alvo ({2}). Retornando ao estado Idle.",
-            new Object[]{this.overloadedGatewaySource, targetedTransaction.getTarget()});
-
-            this.balancer.transitionTo(new IdleState(this.balancer));
             return;
         }
         logger.info("LB_*RESPONSE recebido com target correto. Iniciando envio de LB_*REQUEST.");

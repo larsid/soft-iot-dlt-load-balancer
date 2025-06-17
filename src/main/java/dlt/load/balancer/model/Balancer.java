@@ -206,7 +206,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
 
             startBalanceTransactionSignal = new Status(sourceIdentifier, targetGroup, true, currentDeviceLoad, transaction.getAvgLoad(), false);
             this.sendTransaction(startBalanceTransactionSignal);
-            this.transitionTo(new ProcessSingleLayerSendDeviceState(this, transaction.getSource()));
+            this.transitionTo(new ProcessSingleLayerSendDeviceState(this));
             this.messageSingleLayerSentCounter++;
             return;
         }
@@ -220,7 +220,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
 
             startBalanceTransactionSignal = new LBMultiRequest(sourceIdentifier, targetGroup);
             this.sendTransaction(startBalanceTransactionSignal);
-            this.transitionTo(new ProcessMultiLayerSendDeviceState(this, transaction.getSource()));
+            this.transitionTo(new ProcessMultiLayerSendDeviceState(this));
             this.messageMultiLayerSentCounter++;
         }
 

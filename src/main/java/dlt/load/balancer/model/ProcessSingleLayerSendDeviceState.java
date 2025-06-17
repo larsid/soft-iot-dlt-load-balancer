@@ -12,10 +12,10 @@ import java.util.logging.Logger;
  */
 public class ProcessSingleLayerSendDeviceState extends AbstractProcessSendDeviceState {
 
-    private static final Logger logger = Logger.getLogger(ProcessMultiLayerSendDeviceState.class.getName());
+    private static final Logger logger = Logger.getLogger(ProcessSingleLayerSendDeviceState.class.getName());
 
-    public ProcessSingleLayerSendDeviceState(Balancer balancer, String gatewaySource) {
-        super(balancer, gatewaySource);
+    public ProcessSingleLayerSendDeviceState(Balancer balancer) {
+        super(balancer);
     }
 
     @Override

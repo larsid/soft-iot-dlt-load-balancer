@@ -50,7 +50,7 @@ public class IdleState extends AbstractBalancerState {
                 : new LBReply(source, group, transactionSender);
 
         this.balancer.sendTransaction(reply);
-        this.balancer.transitionTo(new WaitingLBRequestState(balancer));
+        this.balancer.transitionTo(new WaitingLBRequestState(balancer, transactionSender));
     }
     
     @Override

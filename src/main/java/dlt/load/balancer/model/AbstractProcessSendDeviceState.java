@@ -21,9 +21,11 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
     private Long qtyMaxResendTansaction;
     private Device deviceToRemove;
     private BalancerState waitingLBDeviceRecivedReplyState;
+    private final String overloadedGatewaySource;
 
-    public AbstractProcessSendDeviceState(Balancer balancer) {
+    public AbstractProcessSendDeviceState(Balancer balancer, String gatewaySource) {
         super(balancer);
+        this.overloadedGatewaySource = gatewaySource;
         this.qtyMaxResendTansaction = this.balancer.qtyMaxTimeResendTransaction();
     }
 
@@ -35,20 +37,30 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
 
     @Override
     protected void handleValidTransaction(Transaction transaction) {
-        if(transaction == null){
+        if (transaction == null) {
             logger.warning("VIXE");
             return;
         }
-        if (!(transaction instanceof TargetedTransaction)){
+        if (!(transaction instanceof TargetedTransaction)) {
             logger.log(Level.WARNING, "Transaction {0} recived but is not a targeted transaction", transaction.getType());
             return;
         }
-        String transTarget = ((TargetedTransaction) transaction).getTarget();
-        if (!this.source.equals(transTarget)){
+        TargetedTransaction targetedTransaction = ((TargetedTransaction) transaction);
+
+        String transSource = targetedTransaction.getSource();
+        if (!transSource.equals(this.overloadedGatewaySource)) {
+            return;
+        }
+        
+        if (!targetedTransaction.isSameTarget(this.source)) {
+            logger.log(Level.INFO, "O gateway {1} escolheu outro alvo ({2}). Retornando ao estado Idle.",
+            new Object[]{this.overloadedGatewaySource, targetedTransaction.getTarget()});
+
+            this.balancer.transitionTo(new IdleState(this.balancer));
             return;
         }
         logger.info("LB_*RESPONSE recebido com target correto. Iniciando envio de LB_*REQUEST.");
-        
+
         Transaction transactionRequest;
         String sender = transaction.getSource();
         try {
@@ -90,7 +102,7 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
     }
 
     protected abstract Transaction buildTransaction(String deviceJson, String sender);
-    
+
     protected abstract void handlePostSendTransaction();
 
 }

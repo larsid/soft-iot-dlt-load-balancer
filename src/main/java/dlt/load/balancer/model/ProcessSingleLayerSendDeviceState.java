@@ -35,7 +35,7 @@ public class ProcessSingleLayerSendDeviceState extends AbstractProcessSendDevice
 
     @Override
     protected void handlePostSendTransaction() {
-        logger.info("LB_ENTRY_REPLY Sent successfully");
+        logger.info("LB_Request Sent successfully");
     }
 
 }

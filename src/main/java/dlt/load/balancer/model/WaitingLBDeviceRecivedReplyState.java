@@ -34,8 +34,7 @@ public class WaitingLBDeviceRecivedReplyState extends AbstractBalancerState {
     @Override
     protected boolean isValidTransaction(Transaction transaction) {
         return transaction.is(TransactionType.LB_REPLY) 
-                || (transaction.isMultiLayerTransaction() 
-                && transaction.is(TransactionType.LB_MULTI_DEVICE_RESPONSE));
+                || transaction.is(TransactionType.LB_MULTI_DEVICE_RESPONSE);
     }
 
     @Override

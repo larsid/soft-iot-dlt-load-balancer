@@ -66,7 +66,7 @@ public abstract class AbstractBalancerState implements BalancerState {
             this.handleInvalidTransaction(transaction);
             return;
         }
-
+        
         if (this.balancer.shouldDisplayPastTimeTransPublication()) {
             String time = TimeFormatter.formatTimeElapsed(transaction.getPublishedAt());
             logger.log(Level.INFO, "{0} - {1}", new Object[]{transaction.getType(), time});

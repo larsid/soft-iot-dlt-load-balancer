@@ -24,8 +24,7 @@ public class ProcessMultiLayerSendDeviceState extends AbstractProcessSendDeviceS
 
     @Override
     protected boolean isValidTransaction(Transaction transaction) {
-        return transaction.isMultiLayerTransaction()
-                && transaction.is(TransactionType.LB_MULTI_RESPONSE);
+        return transaction.is(TransactionType.LB_MULTI_RESPONSE);
     }
 
     @Override

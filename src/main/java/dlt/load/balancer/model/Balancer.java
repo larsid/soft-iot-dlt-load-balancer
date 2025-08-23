@@ -205,8 +205,8 @@ public class Balancer implements ILedgerSubscriber, Runnable {
             logger.log(Level.INFO, "Solicitação interna de balanceamento de camada unica nº {0} iniciada.", messageSingleLayerSentCounter);
 
             startBalanceTransactionSignal = new Status(sourceIdentifier, targetGroup, true, currentDeviceLoad, transaction.getAvgLoad(), false);
-            this.sendTransaction(startBalanceTransactionSignal);
             this.transitionTo(new ProcessSingleLayerSendDeviceState(this));
+            this.sendTransaction(startBalanceTransactionSignal);
             this.messageSingleLayerSentCounter++;
             return;
         }
@@ -219,8 +219,8 @@ public class Balancer implements ILedgerSubscriber, Runnable {
             logger.log(Level.INFO, "Solicitação interna de balanceamento de multi camadas nº {0} iniciada.", messageMultiLayerSentCounter);
 
             startBalanceTransactionSignal = new LBMultiRequest(sourceIdentifier, targetGroup);
-            this.sendTransaction(startBalanceTransactionSignal);
             this.transitionTo(new ProcessMultiLayerSendDeviceState(this));
+            this.sendTransaction(startBalanceTransactionSignal);
             this.messageMultiLayerSentCounter++;
         }
 

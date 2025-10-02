@@ -17,6 +17,7 @@ import java.util.logging.Logger;
 public class WaitingLBRequestState extends AbstractBalancerState {
 
     private static final Logger logger = Logger.getLogger(WaitingLBRequestState.class.getName());
+
     private final String overloadedGatewaySource;
 
     public WaitingLBRequestState(Balancer balancer, String overloadedGateway) {
@@ -27,11 +28,11 @@ public class WaitingLBRequestState extends AbstractBalancerState {
     @Override
     public void onEnter() {
         Long LBRequestTimeWaiting = this.balancer.getLBRequestTimeWaiting();
-        this.balancer.scheduleTimeout(LBRequestTimeWaiting);
+        this.scheduleTimeout(LBRequestTimeWaiting);
     }
 
     @Override
-    protected boolean isValidTransaction(Transaction transaction) {
+    protected boolean isValidTransactionForThisState(Transaction transaction) {
         return transaction.is(TransactionType.LB_REQUEST)
                 || transaction.is(TransactionType.LB_MULTI_DEVICE_REQUEST);
     }
@@ -42,7 +43,7 @@ public class WaitingLBRequestState extends AbstractBalancerState {
     }
 
     @Override
-    protected void handleValidTransaction(Transaction transaction) {
+    protected void handleValidTransaction(Transaction transaction, String currentGatewayId) {
         TargetedTransaction targetedTrans = ((TargetedTransaction) transaction);
 
         if (!targetedTrans.getSource().equals(this.overloadedGatewaySource)) {
@@ -51,11 +52,11 @@ public class WaitingLBRequestState extends AbstractBalancerState {
             return;
         }
 
-        if (!targetedTrans.isSameTarget(source)) {
+        if (!targetedTrans.isSameTarget(currentGatewayId)) {
             logger.log(Level.INFO, "O gateway {0} escolheu outro alvo ({1}). Retornando ao estado Idle.",
                     new Object[]{this.overloadedGatewaySource, targetedTrans.getTarget()});
 
-            this.balancer.transitionTo(new IdleState(this.balancer));
+            this.transitionTo(new IdleState(this.balancer));
             return;
         }
 
@@ -67,12 +68,12 @@ public class WaitingLBRequestState extends AbstractBalancerState {
         String transactionSender = transaction.getSource();
 
         Transaction reply = transaction.isMultiLayerTransaction()
-                ? new LBMultiDeviceResponse(source, group, device, transactionSender)
-                : new Reply(source, group, transactionSender);
+                ? new LBMultiDeviceResponse(currentGatewayId, group, device, transactionSender)
+                : new Reply(currentGatewayId, group, transactionSender);
 
         this.balancer.sendTransaction(reply);
         logger.log(Level.INFO, "{0} Sended.", reply.getType());
-        this.balancer.transitionTo(new IdleState(balancer));
+        this.transitionTo(new IdleState(balancer));
     }
 
 }

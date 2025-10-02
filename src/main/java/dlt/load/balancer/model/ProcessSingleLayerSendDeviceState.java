@@ -19,12 +19,12 @@ public class ProcessSingleLayerSendDeviceState extends AbstractProcessSendDevice
     }
 
     @Override
-    protected Transaction buildTransaction(String deviceJson, String sender) {
-        return new Request(source, group, deviceJson, sender);
+    protected Transaction buildTransaction(String deviceJson, String currentGatewayId, String sender) {
+        return new Request(currentGatewayId, group, deviceJson, sender);
     }
 
     @Override
-    protected boolean isValidTransaction(Transaction transaction) {
+    protected boolean isValidTransactionForThisState(Transaction transaction) {
         return transaction.is(TransactionType.LB_ENTRY_REPLY);
     }
 

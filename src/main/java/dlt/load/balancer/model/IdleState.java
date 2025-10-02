@@ -21,12 +21,11 @@ public class IdleState extends AbstractBalancerState {
 
     @Override
     public void onEnter() {
-        this.balancer.cancelTimeout();
+        this.cancelTimeout();
     }
 
-
     @Override
-    protected boolean isValidTransaction(Transaction transaction) {
+    protected boolean isValidTransactionForThisState(Transaction transaction) {
         return transaction.is(TransactionType.LB_ENTRY)
                 || transaction.is(TransactionType.LB_MULTI_REQUEST);
     }
@@ -37,25 +36,24 @@ public class IdleState extends AbstractBalancerState {
     }
 
     @Override
-    public void handleValidTransaction(Transaction transaction) {
-        if (!this.balancer.canReciveNewDevice()) {
-            logger.info("This gateway is not avaliable to recive new devices.");
-            return;
-        }
-        
+    protected void handleValidTransaction(Transaction transaction, String currentGatewayId) {
         String transactionSender = transaction.getSource();
-
+        
         Transaction reply = transaction.isMultiLayerTransaction()
-                ? new LBMultiResponse(source, group, transactionSender)
-                : new LBReply(source, group, transactionSender);
+                ? new LBMultiResponse(currentGatewayId, group, transactionSender)
+                : new LBReply(currentGatewayId, group, transactionSender);
 
         this.balancer.sendTransaction(reply);
-        this.balancer.transitionTo(new WaitingLBRequestState(balancer, transactionSender));
+        this.hookTransitionTo(new WaitingLBRequestState(balancer, transactionSender));
+    }
+
+    @Override
+    public boolean canProcessLoopback(Transaction transaction) {
+        return this.isValidTransactionForThisState(transaction);
     }
     
-    @Override
-    public boolean canProcessLoopback(Transaction transaction){
-        return this.isValidTransaction(transaction);
+    public void hookTransitionTo(AbstractBalancerState state){
+        this.transitionTo(state);
     }
 
 }

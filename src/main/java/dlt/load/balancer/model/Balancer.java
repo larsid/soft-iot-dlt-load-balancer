@@ -21,6 +21,7 @@ import br.uefs.larsid.extended.mapping.devices.services.IDevicePropertiesManager
 import br.uefs.larsid.extended.mapping.devices.tatu.DeviceWrapper;
 import br.ufba.dcc.wiser.soft_iot.entities.Device;
 import dlt.auth.services.IPublisher;
+import dlt.client.tangle.hornet.enums.TransactionType;
 import dlt.client.tangle.hornet.model.transactions.LBMultiRequest;
 import dlt.client.tangle.hornet.model.transactions.Status;
 import dlt.client.tangle.hornet.model.transactions.Transaction;
@@ -36,7 +37,6 @@ import dlt.id.manager.services.IIDManagerService;
 public class Balancer implements ILedgerSubscriber, Runnable {
 
     private ScheduledExecutorService scheduler;
-    private ScheduledFuture<?> timeoutFuture;
 
     private LedgerConnector connector;
 
@@ -45,24 +45,24 @@ public class Balancer implements ILedgerSubscriber, Runnable {
     private IDLTGroupManager groupManager;
     private IPublisher iPublisher;
 
-    private Status internalStatus;
     private boolean isSubscribed;
+    private String gatewayId;
 
-    private final BalancerConfigs configs;
+    private BalancerConfigs configs;
+
     private static final Logger logger = Logger.getLogger(Balancer.class.getName());
+
+    private BalancerStateManager stateManager;
 
     private int messageSingleLayerSentCounter;
     private int messageMultiLayerSentCounter;
     private final int MAX_ATTEMPTS_SEND_START_BALANCE;
-
-    private BalancerState state;
 
     public Balancer() {
         this.isSubscribed = false;
         this.messageSingleLayerSentCounter = 0;
         this.messageMultiLayerSentCounter = 0;
         this.MAX_ATTEMPTS_SEND_START_BALANCE = 3;
-        this.configs = new BalancerConfigs();
     }
 
     private ScheduledExecutorService buildScheduledExecutorService() {
@@ -95,10 +95,19 @@ public class Balancer implements ILedgerSubscriber, Runnable {
     }
 
     public void start() {
+        this.configs = BalancerConfigs.getInstance();
         logger.info(this.configs.toString());
+
+        this.gatewayId = new StringBuilder(this.groupManager.getGroup())
+                .append("/")
+                .append(this.idManager.getIP())
+                .append("/")
+                .append(this.configs.getMqttPort())
+                .toString();
+
         this.scheduler = this.buildScheduledExecutorService();
         this.scheduler.scheduleAtFixedRate(this, 0, 5, TimeUnit.SECONDS);
-        this.state = new IdleState(this);
+        this.stateManager = new BalancerStateManager();
     }
 
     public void stop() {
@@ -168,70 +177,12 @@ public class Balancer implements ILedgerSubscriber, Runnable {
         }
     }
 
-    public void updateInternalStatus(Status transaction) {
-        this.internalStatus = transaction;
-
-        double currentDeviceLoad = transaction.getLastLoad();
-        double deviceLoadLimit = this.configs.getLoadLimit().doubleValue();
-
-        boolean isMultiLayerBalancer = this.isMultiLayerBalancer();
-        boolean isBalanced = currentDeviceLoad <= deviceLoadLimit;
-
-        if (isBalanced) {
-            if (isMultiLayerBalancer) {
-                this.messageMultiLayerSentCounter = 0;
-            } else {
-                this.messageSingleLayerSentCounter = 0;
-            }
-            return;
-        }
-
-        boolean isCurrentlyIdle = this.state instanceof IdleState;
-
-        if (!isCurrentlyIdle) {
-            return;
-        }
-
-        String sourceIdentifier = this.buildSource();
-        String targetGroup = this.groupManager.getGroup();
-
-        Transaction startBalanceTransactionSignal;
-
-        if (!isMultiLayerBalancer && this.messageSingleLayerSentCounter == MAX_ATTEMPTS_SEND_START_BALANCE) {
-            this.messageSingleLayerSentCounter = 0;
-        }
-
-        if (this.messageSingleLayerSentCounter < MAX_ATTEMPTS_SEND_START_BALANCE) {
-            logger.log(Level.INFO, "Solicitação interna de balanceamento de camada unica nº {0} iniciada.", messageSingleLayerSentCounter);
-
-            startBalanceTransactionSignal = new Status(sourceIdentifier, targetGroup, true, currentDeviceLoad, transaction.getAvgLoad(), false);
-            this.transitionTo(new ProcessSingleLayerSendDeviceState(this));
-            this.sendTransaction(startBalanceTransactionSignal);
-            this.messageSingleLayerSentCounter++;
-            return;
-        }
-
-        if (this.messageMultiLayerSentCounter == MAX_ATTEMPTS_SEND_START_BALANCE) {
-            this.messageMultiLayerSentCounter = 0;
-        }
-
-        if (this.messageMultiLayerSentCounter < MAX_ATTEMPTS_SEND_START_BALANCE) {
-            logger.log(Level.INFO, "Solicitação interna de balanceamento de multi camadas nº {0} iniciada.", messageMultiLayerSentCounter);
-
-            startBalanceTransactionSignal = new LBMultiRequest(sourceIdentifier, targetGroup);
-            this.transitionTo(new ProcessMultiLayerSendDeviceState(this));
-            this.sendTransaction(startBalanceTransactionSignal);
-            this.messageMultiLayerSentCounter++;
-        }
-
-    }
-
     protected Long qtyMaxTimeResendTransaction() {
         return this.configs.getMaxTryResendTransaction();
     }
 
     protected Long getLBStartReplyTimeWaiting() {
-        return this.isMultiLayerBalancer() 
+        return this.isMultiLayerBalancer()
                 ? this.configs.getLBSingleStartReplyTimeout()
                 : this.configs.getLBMultiStartReplyTimeout();
     }
@@ -243,17 +194,13 @@ public class Balancer implements ILedgerSubscriber, Runnable {
     protected Long getLBRequestTimeWaiting() {
         return this.configs.getLBSingleStartReplyTimeout() * 2;
     }
-    
+
     protected boolean shouldDisplayPastTimeTransPublication() {
         return this.configs.shouldDisplayPastTimeTransPub();
     }
 
     protected String getGatewayGroup() {
         return this.groupManager.getGroup();
-    }
-
-    protected boolean canReciveNewDevice() {
-        return this.internalStatus.getAvailable();
     }
 
     protected boolean isMultiLayerBalancer() {
@@ -264,25 +211,16 @@ public class Balancer implements ILedgerSubscriber, Runnable {
         return this.configs.validPublishMessageInterval(publishedAt);
     }
 
-    public void cancelTimeout() {
-        if (timeoutFuture != null) {
-            timeoutFuture.cancel(true);
-        }
+    public void transitionTo(String gatewayTarget, AbstractBalancerState newState) {
+        this.stateManager.transitionTo(gatewayTarget, newState);
     }
 
-    public void transitionTo(BalancerState newState) {
-        String oldStateName = (this.state != null) ? this.state.getClass().getSimpleName() : "null";
-        String newStateName = newState.getClass().getSimpleName();
-
-        logger.log(Level.INFO, "Transição de estado: {0} -> {1}", new Object[]{oldStateName, newStateName});
-
-        this.state = newState;
-        this.state.onEnter();
+    public void transiteOverloadedStateTo(AbstractBalancerState newState, boolean initializeState) {
+        this.stateManager.transiteOverloadedStateTo(newState, initializeState);
     }
 
-    public void scheduleTimeout(long delayMillis) {
-        this.cancelTimeout();
-        timeoutFuture = scheduler.schedule(state::onTimeout, delayMillis, TimeUnit.MILLISECONDS);
+    public ScheduledFuture<?> scheduleTimeout(BalancerState state, long delayMillis) {
+        return scheduler.schedule(state::onTimeout, delayMillis, TimeUnit.MILLISECONDS);
     }
 
     protected Optional<Device> getFirstDevice() throws IOException {
@@ -291,15 +229,6 @@ public class Balancer implements ILedgerSubscriber, Runnable {
             return Optional.empty();
         }
         return Optional.of(devices.get(0));
-    }
-
-    protected String buildSource() {
-        return new StringBuilder(this.groupManager.getGroup())
-                .append("/")
-                .append(this.idManager.getIP())
-                .append("/")
-                .append(this.configs.getMqttPort())
-                .toString();
     }
 
     @Override
@@ -314,7 +243,132 @@ public class Balancer implements ILedgerSubscriber, Runnable {
             logger.log(Level.INFO, "Load balancer - New message with id: {0} is Invalid", messageId);
             return;
         }
-        this.state.handle((Transaction) trans);
+
+        Transaction transaction = (Transaction) trans;
+
+        if (!this.isValidPublishMessageInterval(transaction.getPublishedAt())) {
+            logger.log(Level.WARNING, "{0} foi é considerada antiga.", transaction);
+            return;
+        }
+
+        if (transaction.isMultiLayerTransaction() && !this.isMultiLayerBalancer()) {
+            logger.info("Load balancer - Multilayer message type not allowed.");
+            return;
+        }
+
+        boolean isLoopback = transaction.isLoopback(gatewayId);
+
+        if (transaction.is(TransactionType.LB_STATUS)) {
+            if (!isLoopback) {
+                return;
+            }
+            Status internalStatus = (Status) transaction;
+            this.stateManager.updateInternalStatus(internalStatus);
+            if (this.isGatewayBalanced(internalStatus.getLastLoad())) {
+                logger.info("Gateway already balanced or free to recive new device.");
+                return;
+            }
+            this.startBalancingRequest(internalStatus, this.gatewayId);
+            return;
+        }
+
+        if (this.isTransactionToStartBalancing(transaction)) {
+            if (!this.stateManager.canReciveNewDevice(this.configs.getLoadLimit())) {
+                logger.info("This gateway is not avaliable to recive new devices.");
+                return;
+            }
+            String overloadedGateway = transaction.getSource();
+            
+            this.stateManager.addBalancerRequestHandle(overloadedGateway, new IdleState(this));
+        }
+
+        Optional<BalancerState> optState;
+
+        optState = this.stateManager.getBalancerByTransaction(transaction);
+
+        if (optState.isEmpty()) {
+            logger.log(Level.WARNING,"there not definied state to handler this transaction: {0}", transaction.toString());
+            return;
+        }
+        
+        BalancerState state = optState.get();
+        
+        if (isLoopback && !state.canProcessLoopback(transaction)) {
+            logger.log(Level.INFO, "The current state can not handle loopback message: {0}", transaction.toString());
+            return;
+        }
+
+        state.handle(transaction, gatewayId);
+    }
+
+    public boolean isGatewayBalanced(double currentDeviceLoad) {
+        double deviceLoadLimit = this.configs.getLoadLimit().doubleValue();
+        return currentDeviceLoad <= deviceLoadLimit;
+    }
+
+    public void startBalancingRequestWithCurrentInternalStaus() {
+        Status status = this.stateManager.currentInternalStatus();
+        this.startBalancingRequest(status, gatewayId);
+    }
+
+    public void startBalancingRequest(Status transaction, String gatewayId) {
+
+        boolean isMultiLayerBalancer = this.isMultiLayerBalancer();
+        double currentDeviceLoad = transaction.getLastLoad();
+
+        if (this.isGatewayBalanced(currentDeviceLoad)) {
+            if (isMultiLayerBalancer) {
+                this.messageMultiLayerSentCounter = 0;
+            } else {
+                this.messageSingleLayerSentCounter = 0;
+            }
+            return;
+        }
+
+        if (!this.stateManager.isGatewayOverloadIdleState()) {
+            logger.info("The gateway is balancing. Therefore not will be send a new balancing request.");
+            return;
+        }
+
+        String targetGroup = this.groupManager.getGroup();
+
+        Transaction startBalanceTransactionSignal;
+
+        if (!isMultiLayerBalancer && this.messageSingleLayerSentCounter == MAX_ATTEMPTS_SEND_START_BALANCE) {
+            this.messageSingleLayerSentCounter = 0;
+        }
+
+        if (this.messageSingleLayerSentCounter < MAX_ATTEMPTS_SEND_START_BALANCE) {
+            logger.log(Level.INFO, "Solicitação interna de balanceamento de camada unica nº {0} iniciada.", messageSingleLayerSentCounter);
+
+            startBalanceTransactionSignal = new Status(gatewayId, targetGroup, true, currentDeviceLoad, transaction.getAvgLoad(), false);
+            this.startBalancing(new ProcessSingleLayerSendDeviceState(this), startBalanceTransactionSignal);
+            this.sendTransaction(startBalanceTransactionSignal);
+            this.messageSingleLayerSentCounter++;
+            return;
+        }
+
+        if (this.messageMultiLayerSentCounter == MAX_ATTEMPTS_SEND_START_BALANCE) {
+            this.messageMultiLayerSentCounter = 0;
+        }
+
+        if (this.messageMultiLayerSentCounter < MAX_ATTEMPTS_SEND_START_BALANCE) {
+            logger.log(Level.INFO, "Solicitação interna de balanceamento de multi camadas nº {0} iniciada.", messageMultiLayerSentCounter);
+
+            startBalanceTransactionSignal = new LBMultiRequest(gatewayId, targetGroup);
+            this.startBalancing(new ProcessMultiLayerSendDeviceState(this), startBalanceTransactionSignal);
+            this.messageMultiLayerSentCounter++;
+        }
+    }
+
+    public void startBalancing(AbstractBalancerState nextState, Transaction request) {
+        this.stateManager.transiteOverloadedStateTo(nextState, false);
+        this.sendTransaction(request);
+    }
+
+    private boolean isTransactionToStartBalancing(Transaction transaction) {
+        return transaction.is(TransactionType.LB_ENTRY)
+                || transaction.is(TransactionType.LB_MULTI_REQUEST);
     }
 
     /* Thread para verificar o IP do client tangle e se inscrever nos tópicos

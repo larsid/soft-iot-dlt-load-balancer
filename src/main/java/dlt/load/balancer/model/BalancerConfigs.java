@@ -31,7 +31,9 @@ public class BalancerConfigs {
 
     private static final Logger logger = Logger.getLogger(BalancerConfigs.class.getName());
 
-    public BalancerConfigs() {
+    private static BalancerConfigs instance;
+    
+    private BalancerConfigs() {
         this.balanceable = this.readBalanceableEnv();
         this.multiLayerBalancing = this.readMultiBalanceableEnv();
         this.mqttPort = this.readMqttPortEnv();
@@ -44,6 +46,13 @@ public class BalancerConfigs {
         this.maxTryResendTransaction = this.readMaxTryResendTransaction();
         this.maxQtyConnectedDevices = this.readLoadLimit();
         this.displayPastTimeTransPub = this.readShouldDisplayPastTime();
+    }
+    
+    public static synchronized BalancerConfigs getInstance(){
+        if(instance == null){
+            instance = new BalancerConfigs();
+        }
+        return instance;
     }
 
     public Long getLBSingleStartReplyTimeout() {

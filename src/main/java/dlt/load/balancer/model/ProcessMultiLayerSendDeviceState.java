@@ -18,12 +18,12 @@ public class ProcessMultiLayerSendDeviceState extends AbstractProcessSendDeviceS
     }
 
     @Override
-    protected Transaction buildTransaction(String deviceJson, String sender) {
-        return new LBMultiDevice(source, group, deviceJson, sender);
+    protected Transaction buildTransaction(String deviceJson, String currentGatewayId, String sender) {
+        return new LBMultiDevice(currentGatewayId, group, deviceJson, sender);
     }
 
     @Override
-    protected boolean isValidTransaction(Transaction transaction) {
+    protected boolean isValidTransactionForThisState(Transaction transaction) {
         return transaction.is(TransactionType.LB_MULTI_RESPONSE);
     }
 

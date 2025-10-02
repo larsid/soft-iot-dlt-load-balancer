@@ -10,7 +10,7 @@ public interface BalancerState {
 
     void onEnter();
 
-    void handle(Transaction transaction);
+    void handle(Transaction transaction, String currentGatewayId);
 
     void onTimeout();
     

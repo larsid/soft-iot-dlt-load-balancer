@@ -20,7 +20,7 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
 
     private Long qtyMaxResendTansaction;
     private Device deviceToRemove;
-    private BalancerState waitingLBDeviceRecivedReplyState;
+    private AbstractBalancerState waitingLBDeviceRecivedReplyState;
 
     public AbstractProcessSendDeviceState(Balancer balancer) {
         super(balancer);
@@ -30,11 +30,11 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
     @Override
     public void onEnter() {
         Long waitingTime = this.balancer.getLBStartReplyTimeWaiting();
-        this.balancer.scheduleTimeout(waitingTime);
+        this.scheduleTimeout(waitingTime);
     }
 
     @Override
-    protected void handleValidTransaction(Transaction transaction) {
+    protected void handleValidTransaction(Transaction transaction, String currentGatewayId) {
         if (transaction == null) {
             logger.warning("VIXE");
             return;
@@ -45,7 +45,7 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
         }
         TargetedTransaction targetedTransaction = ((TargetedTransaction) transaction);
         
-        if (!targetedTransaction.isSameTarget(this.source)) {
+        if (!targetedTransaction.isSameTarget(currentGatewayId)) {
             return;
         }
         logger.info("LB_*RESPONSE recebido com target correto. Iniciando envio de LB_*REQUEST.");
@@ -55,7 +55,7 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
         try {
             this.deviceToRemove = this.selectWhichDeviceToRemove();
             String deviceJson = DeviceWrapper.toJSON(deviceToRemove);
-            transactionRequest = this.buildTransaction(deviceJson, sender);
+            transactionRequest = this.buildTransaction(deviceJson, currentGatewayId, sender);
             this.balancer.sendTransaction(transactionRequest);
             this.handlePostSendTransaction();
             this.transiteToNextState();
@@ -69,7 +69,7 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
 
     private void transiteToNextState() {
         if (qtyMaxResendTansaction == 0) {
-            this.balancer.transitionTo(new IdleState(balancer));
+            this.transiteOverloadedStateTo(new OverloadIdleState(balancer));
             return;
         }
 
@@ -77,7 +77,7 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
                 ? this.waitingLBDeviceRecivedReplyState
                 : new WaitingLBDeviceRecivedReplyState(balancer, this, this.deviceToRemove);
 
-        this.balancer.transitionTo(waitingLBDeviceRecivedReplyState);
+        this.transiteOverloadedStateTo(waitingLBDeviceRecivedReplyState);
     }
 
     private Device selectWhichDeviceToRemove() throws IOException {
@@ -90,7 +90,7 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
         logger.log(Level.INFO, "Amount of resent attempts remaining: {0}", --this.qtyMaxResendTansaction);
     }
 
-    protected abstract Transaction buildTransaction(String deviceJson, String sender);
+    protected abstract Transaction buildTransaction(String deviceJson, String currentGatewayId, String sender);
 
     protected abstract void handlePostSendTransaction();
 

@@ -16,10 +16,10 @@ public class WaitingLBDeviceRecivedReplyState extends AbstractBalancerState {
 
     private static final Logger logger = Logger.getLogger(WaitingLBDeviceRecivedReplyState.class.getName());
 
-    private final BalancerState nextState;
+    private final AbstractBalancerState nextState;
     private final Device deviceToSend;
 
-    public WaitingLBDeviceRecivedReplyState(Balancer balancer, BalancerState nextState, Device device) {
+    public WaitingLBDeviceRecivedReplyState(Balancer balancer, AbstractBalancerState nextState, Device device) {
         super(balancer);
         this.nextState = nextState;
         this.deviceToSend = device;
@@ -28,11 +28,11 @@ public class WaitingLBDeviceRecivedReplyState extends AbstractBalancerState {
     @Override
     public void onEnter() {
         Long deviceRecivedReplyTime = this.balancer.getLBDeviceRecivedReplyTimeWaiting();
-        this.balancer.scheduleTimeout(deviceRecivedReplyTime);
+        this.scheduleTimeout(deviceRecivedReplyTime);
     }
 
     @Override
-    protected boolean isValidTransaction(Transaction transaction) {
+    protected boolean isValidTransactionForThisState(Transaction transaction) {
         return transaction.is(TransactionType.LB_REPLY) 
                 || transaction.is(TransactionType.LB_MULTI_DEVICE_RESPONSE);
     }
@@ -43,18 +43,18 @@ public class WaitingLBDeviceRecivedReplyState extends AbstractBalancerState {
     }
 
     @Override
-    protected void handleValidTransaction(Transaction transaction) {
-        if (!((TargetedTransaction) transaction).isSameTarget(source)) {
+    protected void handleValidTransaction(Transaction transaction, String currentGatewayId) {
+        if (!((TargetedTransaction) transaction).isSameTarget(currentGatewayId)) {
             return;
         }
-        this.balancer.cancelTimeout();
+        this.cancelTimeout();
         String ip = transaction.getSource().split("/")[2];
         String port = transaction.getSource().split("/")[3];
         try {
             this.balancer.sendDevice(deviceToSend, ip, port);
-          /*  Transaction transactionDevice = new LBDevice(source, group, this.lastRemovedDevice, trans.getSource());
+          /*  Transaction transactionDevice = new LBDevice(currentGatewayId, group, this.lastRemovedDevice, trans.getSource());
             this.sendTransaction(transactionDevice);*/
-          this.balancer.transitionTo(new IdleState(balancer));
+          this.transitionTo(new OverloadIdleState(balancer));
         } catch (MqttException ex) {
             logger.log(Level.SEVERE, null, ex);
         }
@@ -62,6 +62,7 @@ public class WaitingLBDeviceRecivedReplyState extends AbstractBalancerState {
 
     @Override
     public void onTimeout() {
-        this.balancer.transitionTo(nextState);
+        this.transitionTo(nextState);
     }
+    
 }

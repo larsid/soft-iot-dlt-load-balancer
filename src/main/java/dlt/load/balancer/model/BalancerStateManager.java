@@ -71,22 +71,25 @@ public class BalancerStateManager {
     public void addBalancerRequestHandle(String gatewayId, AbstractBalancerState newState) {
         if (!this.balancerRequestsState.containsKey(gatewayId)) {
              this.balancerRequestsState.put(gatewayId, newState);
+             newState.onEnter();
+             return;
         }
 
-        BalancerState state = this.balancerRequestsState.get(gatewayId);
+        BalancerState currentState = this.balancerRequestsState.get(gatewayId);
         
-        if (this.willNewCancelGatewayBalancing(state, newState)) {
+        if (this.willNewCancelGatewayBalancing(currentState, newState)) {
             logger.log(Level.INFO, 
                     "Was requested the state transaction from {0} to {1} but are't not change because will interrupt balancing.", 
-                    new Object[]{state.toString(), newState.toString()});
+                    new Object[]{currentState.toString(), newState.toString()});
+            return;
         }
         
         this.updateBalanceStateById(gatewayId, newState);
+        newState.onEnter();
     }
     
     private boolean willNewCancelGatewayBalancing(BalancerState currentState, BalancerState newState){
-        return currentState instanceof IdleState && newState instanceof IdleState
-                || newState instanceof IdleState && currentState instanceof WaitingLBRequestState;
+        return !(currentState instanceof IdleState);
     }
 
     public void updateBalanceStateById(String gatewayId, AbstractBalancerState newState) {

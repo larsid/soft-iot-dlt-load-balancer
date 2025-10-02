@@ -21,16 +21,22 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
     private Long qtyMaxResendTansaction;
     private Device deviceToRemove;
     private AbstractBalancerState waitingLBDeviceRecivedReplyState;
+    private String sender;
+    private String currentGatewayId;
 
     public AbstractProcessSendDeviceState(Balancer balancer) {
         super(balancer);
         this.qtyMaxResendTansaction = this.balancer.qtyMaxTimeResendTransaction();
+        this.currentGatewayId = balancer.getGatewayId();
     }
 
     @Override
     public void onEnter() {
         Long waitingTime = this.balancer.getLBStartReplyTimeWaiting();
         this.scheduleTimeout(waitingTime);
+        if(this.shouldSendDeviceTransaction()){
+            this.sendDevice();
+        }
     }
 
     @Override
@@ -44,14 +50,21 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
             return;
         }
         TargetedTransaction targetedTransaction = ((TargetedTransaction) transaction);
-        
+
         if (!targetedTransaction.isSameTarget(currentGatewayId)) {
             return;
         }
         logger.info("LB_*RESPONSE recebido com target correto. Iniciando envio de LB_*REQUEST.");
 
+        this.sender = transaction.getSource();
+        this.currentGatewayId = currentGatewayId;
+        this.sendDevice();
+        this.updateQtyResendTransaction();
+    }
+
+    private void sendDevice() {
         Transaction transactionRequest;
-        String sender = transaction.getSource();
+
         try {
             this.deviceToRemove = this.selectWhichDeviceToRemove();
             String deviceJson = DeviceWrapper.toJSON(deviceToRemove);
@@ -64,7 +77,10 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
         } catch (NoSuchElementException ex) {
             logger.warning("AbstractProcessSendDeviceState - Device list is empty.");
         }
-        this.updateQtyResendTransaction();
+    }
+    
+    private boolean shouldSendDeviceTransaction(){
+        return this.qtyMaxResendTansaction.compareTo(this.balancer.qtyMaxTimeResendTransaction()) != 0;
     }
 
     private void transiteToNextState() {
@@ -87,11 +103,22 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
     }
 
     private void updateQtyResendTransaction() {
-        logger.log(Level.INFO, "Amount of resent attempts remaining: {0}", --this.qtyMaxResendTansaction);
+        this.qtyMaxResendTansaction = this.qtyMaxResendTansaction - 1;
+        logger.log(Level.INFO, "Amount of resent attempts remaining: {0}", this.qtyMaxResendTansaction);
     }
 
     protected abstract Transaction buildTransaction(String deviceJson, String currentGatewayId, String sender);
 
     protected abstract void handlePostSendTransaction();
+    
+    @Override
+    public void onTimeout() {
+        logger.log(Level.WARNING,
+                "Timeout in state {0}, transitioning to OverloadIdleState.",
+                this.getClass().getSimpleName());
+
+        this.transiteOverloadedStateTo(new OverloadIdleState(balancer));
+    }
+
 
 }

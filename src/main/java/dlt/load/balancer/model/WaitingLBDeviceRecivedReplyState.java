@@ -54,7 +54,7 @@ public class WaitingLBDeviceRecivedReplyState extends AbstractBalancerState {
             this.balancer.sendDevice(deviceToSend, ip, port);
           /*  Transaction transactionDevice = new LBDevice(currentGatewayId, group, this.lastRemovedDevice, trans.getSource());
             this.sendTransaction(transactionDevice);*/
-          this.transitionTo(new OverloadIdleState(balancer));
+          this.transiteOverloadedStateTo(new OverloadIdleState(balancer));
         } catch (MqttException ex) {
             logger.log(Level.SEVERE, null, ex);
         }
@@ -62,7 +62,7 @@ public class WaitingLBDeviceRecivedReplyState extends AbstractBalancerState {
 
     @Override
     public void onTimeout() {
-        this.transitionTo(nextState);
+        this.transiteOverloadedStateTo(nextState);
     }
     
 }

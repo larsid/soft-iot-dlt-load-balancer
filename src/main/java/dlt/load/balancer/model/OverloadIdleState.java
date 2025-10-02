@@ -10,7 +10,6 @@ public class OverloadIdleState extends IdleState{
         super(balancer);
     }
     
-    
     @Override
     public void hookTransitionTo(AbstractBalancerState state){
         this.transiteOverloadedStateTo(state);

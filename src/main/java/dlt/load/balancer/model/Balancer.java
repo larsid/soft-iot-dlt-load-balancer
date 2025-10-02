@@ -300,7 +300,9 @@ public class Balancer implements ILedgerSubscriber, Runnable {
 
         state.handle(transaction, gatewayId);
     }
-
+    public String getGatewayId(){
+        return this.gatewayId;
+    }
     public boolean isGatewayBalanced(double currentDeviceLoad) {
         double deviceLoadLimit = this.configs.getLoadLimit().doubleValue();
         return currentDeviceLoad <= deviceLoadLimit;

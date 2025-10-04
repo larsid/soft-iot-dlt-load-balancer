@@ -107,7 +107,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
 
         this.scheduler = this.buildScheduledExecutorService();
         this.scheduler.scheduleAtFixedRate(this, 0, 5, TimeUnit.SECONDS);
-        this.stateManager = new BalancerStateManager();
+        this.stateManager = new BalancerStateManager(this);
     }
 
     public void stop() {

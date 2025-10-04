@@ -25,9 +25,10 @@ public class BalancerStateManager {
     private final Predicate<AbstractBalancerState> isStateBalancing;
     private Status internalStatus;
 
-    public BalancerStateManager() {
+    public BalancerStateManager(Balancer balancer) {
         this.balancerRequestsState = new HashMap<>();
         this.isStateBalancing = (state) -> !(state instanceof IdleState);
+        this.overloadedGatewayState = new OverloadIdleState(balancer);
     }
 
     public void transitionTo(String gatewayTarget, AbstractBalancerState newState) {
@@ -47,10 +48,9 @@ public class BalancerStateManager {
             this.overloadedGatewayState.onEnter();
         }
     }
-   
+    
     public boolean isGatewayOverloadIdleState() {
-        return this.overloadedGatewayState != null
-                && this.overloadedGatewayState instanceof OverloadIdleState;
+        return this.overloadedGatewayState instanceof OverloadIdleState;
     }
 
     private void logStateTransition(BalancerState oldState, BalancerState newState, boolean isOverload) {

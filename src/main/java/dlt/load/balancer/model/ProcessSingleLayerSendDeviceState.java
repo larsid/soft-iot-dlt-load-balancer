@@ -14,8 +14,8 @@ public class ProcessSingleLayerSendDeviceState extends AbstractProcessSendDevice
 
     private static final Logger logger = Logger.getLogger(ProcessSingleLayerSendDeviceState.class.getName());
 
-    public ProcessSingleLayerSendDeviceState(Balancer balancer) {
-        super(balancer);
+    public ProcessSingleLayerSendDeviceState(Balancer balancer, Transaction transaction) {
+        super(balancer, transaction);
     }
 
     @Override

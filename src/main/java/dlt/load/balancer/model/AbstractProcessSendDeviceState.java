@@ -7,6 +7,8 @@ import java.util.logging.Logger;
 
 import br.uefs.larsid.extended.mapping.devices.tatu.DeviceWrapper;
 import br.ufba.dcc.wiser.soft_iot.entities.Device;
+import dlt.client.tangle.hornet.model.transactions.LBMultiRequest;
+import dlt.client.tangle.hornet.model.transactions.Status;
 import dlt.client.tangle.hornet.model.transactions.TargetedTransaction;
 import dlt.client.tangle.hornet.model.transactions.Transaction;
 
@@ -23,20 +25,31 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
     private AbstractBalancerState waitingLBDeviceRecivedReplyState;
     private String sender;
     private String currentGatewayId;
+    private Transaction startBalancingTransaction;
 
-    public AbstractProcessSendDeviceState(Balancer balancer) {
+    public AbstractProcessSendDeviceState(Balancer balancer, Transaction referenceTransaction) {
         super(balancer);
         this.qtyMaxResendTansaction = this.balancer.qtyMaxTimeResendTransaction();
         this.currentGatewayId = balancer.getGatewayId();
+        this.startBalancingTransaction = referenceTransaction;
     }
 
     @Override
     public void onEnter() {
         Long waitingTime = this.balancer.getLBStartReplyTimeWaiting();
         this.scheduleTimeout(waitingTime);
-        if(this.shouldSendDeviceTransaction()){
-            this.sendDevice();
+        this.startBalancingTransaction = this.refreshTransaction(startBalancingTransaction);
+        this.balancer.sendTransaction(startBalancingTransaction);
+    }
+
+    private Transaction refreshTransaction(Transaction transaction) {
+        String targetGroup = this.balancer.getGatewayGroup();
+
+        if (!transaction.isMultiLayerTransaction()) {
+            Status status = (Status) transaction;
+            return new Status(currentGatewayId, targetGroup, true, status.getLastLoad(), status.getAvgLoad(), false);
         }
+        return new LBMultiRequest(currentGatewayId, targetGroup);
     }
 
     @Override
@@ -78,10 +91,6 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
             logger.warning("AbstractProcessSendDeviceState - Device list is empty.");
         }
     }
-    
-    private boolean shouldSendDeviceTransaction(){
-        return this.qtyMaxResendTansaction.compareTo(this.balancer.qtyMaxTimeResendTransaction()) != 0;
-    }
 
     private void transiteToNextState() {
         if (qtyMaxResendTansaction == 0) {
@@ -110,7 +119,7 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
     protected abstract Transaction buildTransaction(String deviceJson, String currentGatewayId, String sender);
 
     protected abstract void handlePostSendTransaction();
-    
+
     @Override
     public void onTimeout() {
         logger.log(Level.WARNING,
@@ -119,6 +128,5 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
 
         this.transiteOverloadedStateTo(new OverloadIdleState(balancer));
     }
-
 
 }

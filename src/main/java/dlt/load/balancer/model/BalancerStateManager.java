@@ -19,7 +19,7 @@ public class BalancerStateManager {
     private static final Logger logger = Logger.getLogger(BalancerStateManager.class.getName());
 
     private final Map<String, AbstractBalancerState> balancerRequestsState;
-   
+
     private AbstractBalancerState overloadedGatewayState;
 
     private final Predicate<AbstractBalancerState> isStateBalancing;
@@ -48,7 +48,7 @@ public class BalancerStateManager {
             this.overloadedGatewayState.onEnter();
         }
     }
-    
+
     public boolean isGatewayOverloadIdleState() {
         return this.overloadedGatewayState instanceof OverloadIdleState;
     }
@@ -56,9 +56,9 @@ public class BalancerStateManager {
     private void logStateTransition(BalancerState oldState, BalancerState newState, boolean isOverload) {
         String oldStateName = this.getStateName(oldState);
         String newStateName = this.getStateName(newState);
-        String message = isOverload ? 
-                "Overload State transaction from {0} to {1}" :
-                "State transaction from {0} to {1}";
+        String message = isOverload
+                ? "Overload State transaction from {0} to {1}"
+                : "State transaction from {0} to {1}";
         logger.log(Level.INFO, message, new Object[]{oldStateName, newStateName});
     }
 
@@ -70,25 +70,26 @@ public class BalancerStateManager {
 
     public void addBalancerRequestHandle(String gatewayId, AbstractBalancerState newState) {
         if (!this.balancerRequestsState.containsKey(gatewayId)) {
-             this.balancerRequestsState.put(gatewayId, newState);
-             newState.onEnter();
-             return;
+            this.logStateTransition(null, newState, false);
+            this.balancerRequestsState.put(gatewayId, newState);
+            newState.onEnter();
+            return;
         }
 
         BalancerState currentState = this.balancerRequestsState.get(gatewayId);
-        
+
         if (this.willNewCancelGatewayBalancing(currentState, newState)) {
-            logger.log(Level.INFO, 
-                    "Was requested the state transaction from {0} to {1} but are't not change because will interrupt balancing.", 
+            logger.log(Level.INFO,
+                    "Was requested the state transaction from {0} to {1} but are't not change because will interrupt balancing.",
                     new Object[]{currentState.toString(), newState.toString()});
             return;
         }
-        
+
         this.updateBalanceStateById(gatewayId, newState);
         newState.onEnter();
     }
-    
-    private boolean willNewCancelGatewayBalancing(BalancerState currentState, BalancerState newState){
+
+    private boolean willNewCancelGatewayBalancing(BalancerState currentState, BalancerState newState) {
         return !(currentState instanceof IdleState);
     }
 
@@ -120,7 +121,7 @@ public class BalancerStateManager {
     }
 
     public Optional<BalancerState> getBalancerByTransaction(Transaction transaction) {
-        if(this.isBalancingStartResponseTransaction(transaction) && !this.isGatewayOverloadIdleState()){
+        if (this.isBalancingStartResponseTransaction(transaction) && !this.isGatewayOverloadIdleState()) {
             return Optional.ofNullable(this.overloadedGatewayState);
         }
         String transactionSender = transaction.getSource();

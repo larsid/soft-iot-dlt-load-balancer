@@ -273,12 +273,15 @@ public class Balancer implements ILedgerSubscriber, Runnable {
         }
 
         if (this.isTransactionToStartBalancing(transaction)) {
+            if(isLoopback){
+                return;
+            }
             if (!this.stateManager.canReciveNewDevice(this.configs.getLoadLimit())) {
                 logger.info("This gateway is not avaliable to recive new devices.");
                 return;
             }
             String overloadedGateway = transaction.getSource();
-            
+
             this.stateManager.addBalancerRequestHandle(overloadedGateway, new IdleState(this));
         }
 
@@ -287,12 +290,12 @@ public class Balancer implements ILedgerSubscriber, Runnable {
         optState = this.stateManager.getBalancerByTransaction(transaction);
 
         if (optState.isEmpty()) {
-            logger.log(Level.WARNING,"there not definied state to handler this transaction: {0}", transaction.toString());
+            logger.log(Level.WARNING, "there not definied state to handler this transaction: {0}", transaction.toString());
             return;
         }
-        
+
         BalancerState state = optState.get();
-        
+
         if (isLoopback && !state.canProcessLoopback(transaction)) {
             logger.log(Level.INFO, "The current state can not handle loopback message: {0}", transaction.toString());
             return;
@@ -300,9 +303,11 @@ public class Balancer implements ILedgerSubscriber, Runnable {
 
         state.handle(transaction, gatewayId);
     }
-    public String getGatewayId(){
+
+    public String getGatewayId() {
         return this.gatewayId;
     }
+
     public boolean isGatewayBalanced(double currentDeviceLoad) {
         double deviceLoadLimit = this.configs.getLoadLimit().doubleValue();
         return currentDeviceLoad <= deviceLoadLimit;
@@ -344,8 +349,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
             logger.log(Level.INFO, "Solicitação interna de balanceamento de camada unica nº {0} iniciada.", messageSingleLayerSentCounter);
 
             startBalanceTransactionSignal = new Status(gatewayId, targetGroup, true, currentDeviceLoad, transaction.getAvgLoad(), false);
-            this.startBalancing(new ProcessSingleLayerSendDeviceState(this), startBalanceTransactionSignal);
-            this.sendTransaction(startBalanceTransactionSignal);
+            this.stateManager.transiteOverloadedStateTo(new ProcessMultiLayerSendDeviceState(this, startBalanceTransactionSignal), true);
             this.messageSingleLayerSentCounter++;
             return;
         }
@@ -358,13 +362,13 @@ public class Balancer implements ILedgerSubscriber, Runnable {
             logger.log(Level.INFO, "Solicitação interna de balanceamento de multi camadas nº {0} iniciada.", messageMultiLayerSentCounter);
 
             startBalanceTransactionSignal = new LBMultiRequest(gatewayId, targetGroup);
-            this.startBalancing(new ProcessMultiLayerSendDeviceState(this), startBalanceTransactionSignal);
+            this.stateManager.transiteOverloadedStateTo(new ProcessMultiLayerSendDeviceState(this, startBalanceTransactionSignal), true);
+
             this.messageMultiLayerSentCounter++;
         }
     }
 
     public void startBalancing(AbstractBalancerState nextState, Transaction request) {
-        this.stateManager.transiteOverloadedStateTo(nextState, false);
         this.sendTransaction(request);
     }
 

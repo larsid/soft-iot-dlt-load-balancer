@@ -62,6 +62,11 @@ public class WaitingLBDeviceRecivedReplyState extends AbstractBalancerState {
 
     @Override
     public void onTimeout() {
+        logger.log(Level.WARNING,
+                "Timeout in state {0}, transitioning to {1}.",
+                new Object[]{this.getClass().getSimpleName(),
+                    nextState.getClass().getSimpleName()});
+        
         this.transiteOverloadedStateTo(nextState);
     }
     

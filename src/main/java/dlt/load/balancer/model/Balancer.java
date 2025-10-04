@@ -282,7 +282,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
             }
             String overloadedGateway = transaction.getSource();
 
-            this.stateManager.addBalancerRequestHandle(overloadedGateway, new IdleState(this));
+            this.stateManager.addBalancerRequestHandle(overloadedGateway, new IdleState(this, overloadedGateway));
         }
 
         Optional<BalancerState> optState;

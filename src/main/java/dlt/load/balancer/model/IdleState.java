@@ -15,8 +15,8 @@ public class IdleState extends AbstractBalancerState {
 
     private static final Logger logger = Logger.getLogger(IdleState.class.getName());
 
-    public IdleState(Balancer balancer) {
-        super(balancer);
+    public IdleState(Balancer balancer, String gatewayTagert) {
+        super(balancer, gatewayTagert);
     }
 
     @Override

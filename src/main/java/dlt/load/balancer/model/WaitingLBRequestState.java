@@ -18,11 +18,9 @@ public class WaitingLBRequestState extends AbstractBalancerState {
 
     private static final Logger logger = Logger.getLogger(WaitingLBRequestState.class.getName());
 
-    private final String overloadedGatewaySource;
 
     public WaitingLBRequestState(Balancer balancer, String overloadedGateway) {
-        super(balancer);
-        this.overloadedGatewaySource = overloadedGateway;
+        super(balancer, overloadedGateway);
     }
 
     @Override
@@ -46,17 +44,17 @@ public class WaitingLBRequestState extends AbstractBalancerState {
     protected void handleValidTransaction(Transaction transaction, String currentGatewayId) {
         TargetedTransaction targetedTrans = ((TargetedTransaction) transaction);
 
-        if (!targetedTrans.getSource().equals(this.overloadedGatewaySource)) {
+        if (!targetedTrans.getSource().equals(this.gatewayTarget)) {
             logger.log(Level.INFO, "Ignorando resposta de um gateway inesperado ({0}). Esperando por {1}.",
-                    new Object[]{transaction.getSource(), this.overloadedGatewaySource});
+                    new Object[]{transaction.getSource(), this.gatewayTarget});
             return;
         }
 
         if (!targetedTrans.isSameTarget(currentGatewayId)) {
             logger.log(Level.INFO, "O gateway {0} escolheu outro alvo ({1}). Retornando ao estado Idle.",
-                    new Object[]{this.overloadedGatewaySource, targetedTrans.getTarget()});
+                    new Object[]{this.gatewayTarget, targetedTrans.getTarget()});
 
-            this.transitionTo(new IdleState(this.balancer));
+            this.transitionTo(new IdleState(this.balancer, this.gatewayTarget));
             return;
         }
 
@@ -73,7 +71,7 @@ public class WaitingLBRequestState extends AbstractBalancerState {
 
         this.balancer.sendTransaction(reply);
         logger.log(Level.INFO, "{0} Sended.", reply.getType());
-        this.transitionTo(new IdleState(balancer));
+        this.transitionTo(new IdleState(balancer, gatewayTarget));
     }
 
 }

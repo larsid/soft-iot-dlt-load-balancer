@@ -28,7 +28,7 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
     private Transaction startBalancingTransaction;
 
     public AbstractProcessSendDeviceState(Balancer balancer, Transaction referenceTransaction) {
-        super(balancer);
+        super(balancer, null);
         this.qtyMaxResendTansaction = this.balancer.qtyMaxTimeResendTransaction();
         this.currentGatewayId = balancer.getGatewayId();
         this.startBalancingTransaction = referenceTransaction;

@@ -7,7 +7,7 @@ package dlt.load.balancer.model;
 public class OverloadIdleState extends IdleState{
     
     public OverloadIdleState(Balancer balancer) {
-        super(balancer);
+        super(balancer, null);
     }
     
     @Override

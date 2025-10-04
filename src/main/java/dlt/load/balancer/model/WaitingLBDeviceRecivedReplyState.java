@@ -20,7 +20,7 @@ public class WaitingLBDeviceRecivedReplyState extends AbstractBalancerState {
     private final Device deviceToSend;
 
     public WaitingLBDeviceRecivedReplyState(Balancer balancer, AbstractBalancerState nextState, Device device) {
-        super(balancer);
+        super(balancer, null);
         this.nextState = nextState;
         this.deviceToSend = device;
     }

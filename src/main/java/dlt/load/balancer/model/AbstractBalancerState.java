@@ -17,13 +17,14 @@ public abstract class AbstractBalancerState implements BalancerState {
 
     private ScheduledFuture<?> internalTimeout;
 
-    private String gatewayTarget;
+    protected String gatewayTarget;
     
     protected String group;
 
-    protected AbstractBalancerState(Balancer balancer) {
+    protected AbstractBalancerState(Balancer balancer, String gatewayTarget) {
         this.balancer = balancer;
         this.group = balancer.getGatewayGroup();
+        this.gatewayTarget = gatewayTarget;
     }
 
     @Override
@@ -47,7 +48,7 @@ public abstract class AbstractBalancerState implements BalancerState {
 
         if (this.balancer.shouldDisplayPastTimeTransPublication()) {
             String time = TimeFormatter.formatTimeElapsed(transaction.getPublishedAt());
-            logger.log(Level.INFO, "{0} - {1}", new Object[]{transaction.getType(), time});
+            logger.log(Level.INFO, "{0} - {1} - {2}", new Object[]{transaction.getType(), time, transaction.getSource()});
         }
 
         this.handleValidTransaction(transaction, currentGatewayId);
@@ -59,7 +60,7 @@ public abstract class AbstractBalancerState implements BalancerState {
                 "Timeout in state {0}, transitioning to IdleState.",
                 this.getClass().getSimpleName());
 
-        this.transitionTo(new IdleState(balancer));
+        this.transitionTo(new IdleState(balancer, this.gatewayTarget));
     }
 
     @Override

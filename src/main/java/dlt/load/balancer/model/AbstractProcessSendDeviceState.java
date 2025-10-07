@@ -39,7 +39,12 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
         Long waitingTime = this.balancer.getLBStartReplyTimeWaiting();
         this.scheduleTimeout(waitingTime);
         this.startBalancingTransaction = this.refreshTransaction(startBalancingTransaction);
-        this.balancer.sendTransaction(startBalancingTransaction);
+        boolean transactionSent = this.balancer.sendTransaction(startBalancingTransaction);
+
+        if (!transactionSent) {
+            logger.log(Level.SEVERE, "Failed to send transaction onEnter. Transitioning to idle state to prevent deadlock.");
+            this.transiteOverloadedStateTo(new OverloadIdleState(balancer));
+        }
     }
 
     private Transaction refreshTransaction(Transaction transaction) {
@@ -71,10 +76,10 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
 
         this.sender = transaction.getSource();
         this.currentGatewayId = currentGatewayId;
-        this.sendPreConfirmSendDevice();
+        this.sendDevice();
     }
 
-    private void sendPreConfirmSendDevice() {
+    private void sendDevice() {
         Transaction transactionRequest;
 
         try {

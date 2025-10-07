@@ -121,7 +121,7 @@ public class BalancerStateManager {
     }
 
     public Optional<BalancerState> getBalancerByTransaction(Transaction transaction) {
-        if (this.isBalancingStartResponseTransaction(transaction) && !this.isGatewayOverloadIdleState()) {
+        if (this.isGatewayOverloadTransactions(transaction) && !this.isGatewayOverloadIdleState()) {
             return Optional.ofNullable(this.overloadedGatewayState);
         }
         String transactionSender = transaction.getSource();
@@ -135,9 +135,11 @@ public class BalancerStateManager {
         return Optional.of(this.balancerRequestsState.get(transactionSender));
     }
 
-    private boolean isBalancingStartResponseTransaction(Transaction transaction) {
+   private boolean isGatewayOverloadTransactions(Transaction transaction) {
         return transaction.is(TransactionType.LB_ENTRY_REPLY)
-                || transaction.is(TransactionType.LB_MULTI_RESPONSE);
+                || transaction.is(TransactionType.LB_MULTI_RESPONSE)
+                || transaction.is(TransactionType.LB_REPLY)
+                || transaction.is(TransactionType.LB_MULTI_DEVICE_RESPONSE);
     }
 
     public void updateInternalStatus(Status internalStatus) {

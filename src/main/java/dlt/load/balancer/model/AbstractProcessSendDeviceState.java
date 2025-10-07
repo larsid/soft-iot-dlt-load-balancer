@@ -71,11 +71,10 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
 
         this.sender = transaction.getSource();
         this.currentGatewayId = currentGatewayId;
-        this.sendDevice();
-        this.updateQtyResendTransaction();
+        this.sendPreConfirmSendDevice();
     }
 
-    private void sendDevice() {
+    private void sendPreConfirmSendDevice() {
         Transaction transactionRequest;
 
         try {
@@ -85,6 +84,7 @@ public abstract class AbstractProcessSendDeviceState extends AbstractBalancerSta
             this.balancer.sendTransaction(transactionRequest);
             this.handlePostSendTransaction();
             this.transiteToNextState();
+            this.updateQtyResendTransaction();
         } catch (IOException ex) {
             logger.log(Level.SEVERE, null, ex);
         } catch (NoSuchElementException ex) {

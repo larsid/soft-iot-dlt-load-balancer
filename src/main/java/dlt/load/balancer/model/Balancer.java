@@ -158,6 +158,8 @@ public class Balancer implements ILedgerSubscriber, Runnable {
             );
 
             deviceManager.removeDevice(device.getId());
+            
+            logger.log(Level.INFO, "Device with id: {0} sended to gateway with ip {1}.", new Object[]{device.getId(), targetIp});
 
         } catch (IOException ioe) {
             logger.info("Error! To retrieve device list or to remove the first device.");
@@ -290,7 +292,7 @@ public class Balancer implements ILedgerSubscriber, Runnable {
         optState = this.stateManager.getBalancerByTransaction(transaction);
 
         if (optState.isEmpty()) {
-            logger.log(Level.WARNING, "there not definied state to handler this transaction: {0}", transaction.toString());
+            logger.log(Level.WARNING, "There not definied state to handler this transaction: {0}", transaction.toString());
             return;
         }
 

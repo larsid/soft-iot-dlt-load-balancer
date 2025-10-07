@@ -33,7 +33,7 @@ public class WaitingLBDeviceRecivedReplyState extends AbstractBalancerState {
 
     @Override
     protected boolean isValidTransactionForThisState(Transaction transaction) {
-        return transaction.is(TransactionType.LB_REPLY) 
+        return transaction.is(TransactionType.LB_REPLY)
                 || transaction.is(TransactionType.LB_MULTI_DEVICE_RESPONSE);
     }
 
@@ -47,14 +47,14 @@ public class WaitingLBDeviceRecivedReplyState extends AbstractBalancerState {
         if (!((TargetedTransaction) transaction).isSameTarget(currentGatewayId)) {
             return;
         }
-        this.cancelTimeout();
         String ip = transaction.getSource().split("/")[2];
         String port = transaction.getSource().split("/")[3];
         try {
             this.balancer.sendDevice(deviceToSend, ip, port);
-          /*  Transaction transactionDevice = new LBDevice(currentGatewayId, group, this.lastRemovedDevice, trans.getSource());
+            /*  Transaction transactionDevice = new LBDevice(currentGatewayId, group, this.lastRemovedDevice, trans.getSource());
             this.sendTransaction(transactionDevice);*/
-          this.transiteOverloadedStateTo(new OverloadIdleState(balancer));
+            this.transiteOverloadedStateTo(new OverloadIdleState(balancer));
+            this.cancelTimeout();
         } catch (MqttException ex) {
             logger.log(Level.SEVERE, null, ex);
         }
@@ -66,8 +66,8 @@ public class WaitingLBDeviceRecivedReplyState extends AbstractBalancerState {
                 "Timeout in state {0}, transitioning to {1}.",
                 new Object[]{this.getClass().getSimpleName(),
                     nextState.getClass().getSimpleName()});
-        
+
         this.transiteOverloadedStateTo(nextState);
     }
-    
+
 }
